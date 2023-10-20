@@ -2,7 +2,7 @@
 #include "ServoManager.h"
 
 ServoManager::ServoManager(int pin, int minPosition, int maxPosition) {
-  myservo.attach(pin);
+ // myservo.attach(pin);
   pos = 0;
   minPos = minPosition;
   maxPos = maxPosition;
