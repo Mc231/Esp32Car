@@ -2,11 +2,11 @@
 #define CARAPPLICATION_H
 
 #include "WiFi/WiFiManager.h"
-#include "Http/HttpManager.h"
+#include "CarWebServer/CarWebServer.h"
 #include "Control/MotorControl.h"
 #include "Manager/UltrasonicManager.h"
 #include "Camera/CameraManager.h"
-#include "Control/CarController.h"
+#include "Controller/CarController.h"
 #include "esp_camera.h"
 #include "Storage/SPIFFSStorageManager.h"
 #include "Config/ConfigManager.h"
@@ -28,7 +28,7 @@ private:
   MotorControl motorControl;
   UltrasonicManager ultraSonicManager;
   CarController carController;
-  HttpManager httpManager;
+  CarWebServer webServer;
   CameraManager cameraManager;
 };
 

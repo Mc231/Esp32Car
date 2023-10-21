@@ -1,16 +1,16 @@
-#ifndef HTTPMANAGER_H
-#define HTTPMANAGER_H
+#ifndef CARWEBSERVER_H
+#define CARWEBSERVER_H
 
 #include <Arduino.h>
 #include <WebServer.h>
-#include "Control/CarController.h"
+#include "Controller/CarController.h"
 #include <ElegantOTA.h>
 #include "esp_camera.h"
 #include "Config/ConfigManager.h"
 
-class HttpManager {
+class CarWebServer {
 public:
-  HttpManager(CarController& carController, ConfigManager& configManager);
+  CarWebServer(CarController& carController, ConfigManager& configManager);
   void begin();
   void handleSetMotor(); 
   void handleSetMotorPWM();
@@ -26,4 +26,4 @@ private:
   DynamicJsonDocument asJSON(size_t docSize, std::map<std::string, std::any> map) const;
 };
 
-#endif // HTTPMANAGER_H
+#endif // CARWEBSERVER_H

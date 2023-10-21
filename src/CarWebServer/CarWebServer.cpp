@@ -1,12 +1,12 @@
-#include "HttpManager.h"
+#include "CarWebServer.h"
 #include <ArduinoJson.h>
 #include "Html/control_html.h"
 
-HttpManager::HttpManager(CarController& carController, ConfigManager& configManager)
+CarWebServer::CarWebServer(CarController& carController, ConfigManager& configManager)
   : carController(carController), configManager(configManager), server(32231) // Initialize motorControl here
 {}
  
-void HttpManager::begin() {
+void CarWebServer::begin() {
   server.on("/", HTTP_GET, [this]() { handleRoot(); }); 
   server.on("/setMotor", HTTP_PUT, [this]() { handleSetMotor(); }); 
   server.on("/getMotor", HTTP_GET, [this]() { handleMotorState(); }); 
@@ -17,7 +17,7 @@ void HttpManager::begin() {
   server.begin(32231);
 }
 
-void HttpManager::handleSetMotorPWM() {
+void CarWebServer::handleSetMotorPWM() {
   if (server.hasArg("plain") == false) {
     server.send(404, "text/plain", "Body not found");
     return;
@@ -34,7 +34,7 @@ void HttpManager::handleSetMotorPWM() {
   server.send(204);
 }
 
-void HttpManager::handleMotorState() {
+void CarWebServer::handleMotorState() {
   DynamicJsonDocument doc = asJSON(512, carController.getMotorState());
   String response;
   serializeJson(doc, response);
@@ -42,11 +42,11 @@ void HttpManager::handleMotorState() {
 }
 
 
-void HttpManager::handleRoot() {
+void CarWebServer::handleRoot() {
   server.send(200, "text/html", (const char*)control_index_html);
 }
 
-void HttpManager::handleSetMotor() {
+void CarWebServer::handleSetMotor() {
   if (server.hasArg("plain") == false) {
     server.send(404, "text/plain", "Body not found");
     return;
@@ -64,7 +64,7 @@ void HttpManager::handleSetMotor() {
   server.send(204);
 }
 
-void HttpManager::handleGetUltrasonic() {
+void CarWebServer::handleGetUltrasonic() {
   float lastDistance = carController.getLastUltrasonicDistance();
     DynamicJsonDocument doc(256);
   doc["last_distance"] = lastDistance;
@@ -73,7 +73,7 @@ void HttpManager::handleGetUltrasonic() {
   server.send(200, "application/json", response);
 }
 
-void HttpManager::handleCamera() {
+void CarWebServer::handleCamera() {
     if (server.hasArg("plain") == false) {
       server.send(404, "text/plain", "Body not found");
       return;
@@ -97,12 +97,12 @@ void HttpManager::handleCamera() {
     server.send(204, "application/json", response);
 }
 
-void HttpManager::handleClient() {
+void CarWebServer::handleClient() {
   server.handleClient();
   ElegantOTA.loop();
 }
 
-  DynamicJsonDocument HttpManager::asJSON(size_t docSize, std::map<std::string, std::any> map) const {
+  DynamicJsonDocument CarWebServer::asJSON(size_t docSize, std::map<std::string, std::any> map) const {
         DynamicJsonDocument doc(docSize);
 
         for (const auto& item : map) {

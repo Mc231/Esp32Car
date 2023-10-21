@@ -9,7 +9,7 @@ CarApplication::CarApplication(const CarApplicationConfig& config, ConfigManager
     motorControl(leftMotor, rightMotor), 
     ultraSonicManager(config.ultrasonicPin1, config.ultrasonicPin2),
     carController(motorControl, ultraSonicManager),
-    httpManager(carController, configManager),
+    webServer(carController, configManager),
     cameraManager()
 {}
 
@@ -21,12 +21,12 @@ void CarApplication::setup() {
   // Log IP address
   Serial.print("IP Address: ");
   Serial.println(wifiManager.getIPAddress().c_str());
-  httpManager.begin();
+  webServer.begin();
   startCameraServer();
   ultraSonicManager.initialize();
 }
 
 void CarApplication::loop() {
   // Future logic can go here
-  httpManager.handleClient();
+  webServer.handleClient();
 }
