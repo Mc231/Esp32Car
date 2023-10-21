@@ -1,20 +1,21 @@
 #include <Arduino.h>
-#include "AppInitializer.h"
-#include "CarApplication.h"
+#include "Application/AppInitializer.h"
+#include "Application/CarApplication.h"
 
-AppInitializer appInit;
+#define CONFIG_FILE_PATH "/config.cfg"
+
+AppInitializer appInit(CONFIG_FILE_PATH);
 CarApplication* carApp = nullptr;
 
 void setup() {
-    Serial.begin(115200);
-    Serial.print("Free heap memory: ");
-    Serial.println(ESP.getFreeHeap());
-  carApp = appInit.initializeApplication("/config.cfg");
- // carApp->setup();
+  carApp = appInit.initializeApplication();
+  if (carApp) {
+    carApp->setup();
+  }
 }
 
 void loop() {
   if (carApp) {
-   // carApp->loop();
+    carApp->loop();
   }
 }

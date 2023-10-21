@@ -1,7 +1,7 @@
 #ifndef MOTOR_CONTROL_H
 #define MOTOR_CONTROL_H
 
-#include "MotorManager.h"
+#include "Manager/MotorManager.h"
 #include "AbstractControl.h"  // Include the AbstractControl header
 #include <map>
 #include <any>

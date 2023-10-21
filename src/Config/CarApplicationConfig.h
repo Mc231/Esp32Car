@@ -1,10 +1,8 @@
-#include <Arduino.h>
+#include <string>
 
 struct CarApplicationConfig {
-    const char* ssid;
-    const char* ssidPassword;
-    int horizontalServoPin;
-    int verticalServoPin;
+    std::string ssid;
+    std::string ssidPassword;
     int leftMotorPin1;
     int leftMotorPin2;
     int leftMotorPwm;

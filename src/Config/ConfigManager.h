@@ -1,19 +1,22 @@
 #ifndef CONFIGMANAGER_H
 #define CONFIGMANAGER_H
 
-#include "StorageManager.h"
+#include "Storage/StorageManager.h"
+#include "CarApplicationConfig.h"
 #include <string>
 #include <map>
 
 class ConfigManager {
 public:
-    ConfigManager(StorageManager& storageManager);
-    bool loadConfig(const std::string& filePath);
+    ConfigManager(StorageManager& storageManager, const std::string& filePath);
+    bool loadConfig();
     std::string getConfigValue(const std::string& key);
     std::map<std::string, std::string> getConfig();
-
+    CarApplicationConfig getCarApplicationConfig();
 private:
     StorageManager& storageManager;
+    const std::string filePath;
+    CarApplicationConfig config; 
     std::map<std::string, std::string> configData;
 };
 
