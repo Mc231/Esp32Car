@@ -25,7 +25,9 @@ float UltrasonicManager::getLastDistance() const {
   return lastDistance;
 }
 
-std::map<std::string, std::any> UltrasonicManager::getState() const {
+std::map<std::string, std::any> UltrasonicManager::getState() {
+    // TODO: - Do some timer to get value
+    this->lastDistance = getDistance();
     std::map<std::string, std::any> state;
     state["last_distance"] = lastDistance;
     return state;

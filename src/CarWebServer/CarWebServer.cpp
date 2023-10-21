@@ -24,12 +24,14 @@ void CarWebServer::handleSetMotorPWM() {
         server.send(404, "text/plain", "Body not found");
         return;
     }
-
     auto j = json::parse(server.arg("plain").c_str());
-
+    Serial.println(j.dump().c_str());
     if (j.contains("pwm") && j.contains("motor")) {
-        MotorSelection selection = static_cast<MotorSelection>(j["motor"].get<int>());
-        carController.setMotorSpeed(selection, j["pwm"]);
+        int motor = j["motor"].get<int>();
+        MotorSelection selection = static_cast<MotorSelection>(motor);
+    
+        int pwmValue = std::stoi(j["pwm"].get<std::string>());
+        carController.setMotorSpeed(selection, pwmValue);
     }
     server.send(204);
 }
@@ -49,7 +51,7 @@ void CarWebServer::handleSetMotor() {
     }
 
     auto j = json::parse(server.arg("plain").c_str());
-
+    Serial.println(j.dump().c_str());
     if (j.contains("action") && j.contains("motor")) {
         MotorAction action = static_cast<MotorAction>(j["action"].get<int>());
         MotorSelection selection = static_cast<MotorSelection>(j["motor"].get<int>());
