@@ -10,6 +10,7 @@
 #include "esp_camera.h"
 #include "Storage/SPIFFSStorageManager.h"
 #include "Config/ConfigManager.h"
+#include "Monitor/SystemMonitor.h"
 
 void startCameraServer();
 
@@ -20,6 +21,7 @@ public:
   void loop();
 
 private:
+  SystemMonitor systemMonitor;
   CarApplicationConfig config;
   ConfigManager& configManager;
   WiFiManager wifiManager;  

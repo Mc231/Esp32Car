@@ -2,8 +2,8 @@
 #include <ArduinoJson.h>
 #include "Html/control_html.h"
 
-CarWebServer::CarWebServer(CarController& carController, ConfigManager& configManager)
-  : carController(carController), configManager(configManager), server(32231) // Initialize motorControl here
+CarWebServer::CarWebServer(CarController& carController, ConfigManager& configManager, SystemMonitor&)
+  : carController(carController), configManager(configManager), systemMonitor(systemMonitor), server(32231) // Initialize motorControl here
 {}
  
 void CarWebServer::begin() {
