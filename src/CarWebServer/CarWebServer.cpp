@@ -73,20 +73,14 @@ void CarWebServer::handleCamera() {
 
     auto j = json::parse(server.arg("plain").c_str());
 
-    int res = 0;
-
     if (j.contains("frame_size")) {
         int size = j["frame_size"].get<int>();
         sensor_t *s = esp_camera_sensor_get();
         if (s->pixformat == PIXFORMAT_JPEG) {
-            res = s->set_framesize(s, (framesize_t)size);
+            s->set_framesize(s, (framesize_t)size);
         }
     }
-
-    json responseJ;
-    responseJ["frame_size"] = res;
-    String response = responseJ.dump().c_str();
-    server.send(204, "application/json", response);
+    server.send(204);
 }
 
 void CarWebServer::handleSystem() {
