@@ -1,6 +1,8 @@
 #ifndef ULTRASONIC_MANAGER_H
 #define ULTRASONIC_MANAGER_H
 
+#include <map>
+#include <any>
 
 class UltrasonicManager {
 public:
@@ -8,6 +10,7 @@ public:
   void initialize();
   float getDistance();
   float getLastDistance() const;
+  std::map<std::string, std::any> getState() const;
 private:
   int trigPin;
   int echoPin;

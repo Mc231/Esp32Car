@@ -5,13 +5,14 @@
 #include "CarApplicationConfig.h"
 #include <string>
 #include <map>
+#include <any>
 
 class ConfigManager {
 public:
     ConfigManager(StorageManager& storageManager, const std::string& filePath);
     bool loadConfig();
     std::string getConfigValue(const std::string& key);
-    std::map<std::string, std::string> getConfig();
+    std::map<std::string, std::any> getConfig();
     CarApplicationConfig getCarApplicationConfig();
 private:
     StorageManager& storageManager;

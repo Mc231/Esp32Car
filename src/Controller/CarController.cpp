@@ -1,5 +1,4 @@
 #include "CarController.h"
-#include <ArduinoJson.h>
 
 CarController::CarController(MotorControl& motorControl, UltrasonicManager& ultrasonicManager)
   : motorControl(motorControl), ultrasonicManager(ultrasonicManager)
@@ -17,6 +16,6 @@ CarController::CarController(MotorControl& motorControl, UltrasonicManager& ultr
     return motorControl.getState();
   }
 
-  float CarController::getLastUltrasonicDistance() {
-    return ultrasonicManager.getDistance();
+  std::map<std::string, std::any> CarController::getUltrasonicState() {
+    return ultrasonicManager.getState();
   }

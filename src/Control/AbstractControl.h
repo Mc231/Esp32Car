@@ -1,7 +1,6 @@
 #ifndef ABSTRACTCONTROL_H
 #define ABSTRACTCONTROL_H
 
-#include <ArduinoJson.h>
 #include <map>
 #include <any>
 #include <string>

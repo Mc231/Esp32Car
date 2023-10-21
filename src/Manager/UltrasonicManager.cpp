@@ -16,14 +16,17 @@ float UltrasonicManager::getDistance() {
   digitalWrite(trigPin, HIGH);
   delayMicroseconds(10);
   digitalWrite(trigPin, LOW);
-
   long duration = pulseIn(echoPin, HIGH);
-
   lastDistance = (float)duration * 0.0344 / 2.0;
-  Serial.print(lastDistance);
   return lastDistance;
 }
 
 float UltrasonicManager::getLastDistance() const {
   return lastDistance;
+}
+
+std::map<std::string, std::any> UltrasonicManager::getState() const {
+    std::map<std::string, std::any> state;
+    state["last_distance"] = lastDistance;
+    return state;
 }

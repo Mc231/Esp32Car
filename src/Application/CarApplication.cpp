@@ -1,7 +1,8 @@
 #include "CarApplication.h"
 
 CarApplication::CarApplication(const CarApplicationConfig& config, ConfigManager& configMgr)
-  : config(config),
+  : systemMonitor(),
+    config(config),
     configManager(configMgr),
     wifiManager(),
     leftMotor(config.leftMotorPin1, config.leftMotorPin2, config.leftMotorPwm),  
@@ -9,7 +10,7 @@ CarApplication::CarApplication(const CarApplicationConfig& config, ConfigManager
     motorControl(leftMotor, rightMotor), 
     ultraSonicManager(config.ultrasonicPin1, config.ultrasonicPin2),
     carController(motorControl, ultraSonicManager),
-    webServer(carController, configManager),
+    webServer(carController, configManager, systemMonitor),
     cameraManager()
 {}
 

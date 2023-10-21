@@ -13,9 +13,7 @@ public:
   void setMotorSpeed(MotorSelection motorSelection, int speed);
   void setMotorAction(MotorAction action, MotorSelection motorSelection);
   std::map<std::string, std::any> getMotorState();
-  float getLastUltrasonicDistance();
-  
-
+  std::map<std::string, std::any> getUltrasonicState();
 private:
   MotorControl& motorControl;
   UltrasonicManager& ultrasonicManager;

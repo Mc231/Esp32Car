@@ -1,5 +1,4 @@
 #include "CarWebServer.h"
-#include <ArduinoJson.h>
 #include "Html/control_html.h"
 
 CarWebServer::CarWebServer(CarController& carController, ConfigManager& configManager, SystemMonitor&)
@@ -8,93 +7,100 @@ CarWebServer::CarWebServer(CarController& carController, ConfigManager& configMa
  
 void CarWebServer::begin() {
   server.on("/", HTTP_GET, [this]() { handleRoot(); }); 
-  server.on("/setMotor", HTTP_PUT, [this]() { handleSetMotor(); }); 
-  server.on("/getMotor", HTTP_GET, [this]() { handleMotorState(); }); 
-  server.on("/getUltrasonic", HTTP_GET, [this]() { handleGetUltrasonic(); });
-  server.on("/setMotorPWM", HTTP_PUT, [this]() { handleSetMotorPWM(); });
+  server.on("/motor", HTTP_PUT, [this]() { handleSetMotor(); }); 
+  server.on("/motor", HTTP_GET, [this]() { handleMotorState(); }); 
+  server.on("/ultrasonic", HTTP_GET, [this]() { handleGetUltrasonic(); });
+  server.on("/motorPWM", HTTP_PUT, [this]() { handleSetMotorPWM(); });
   server.on("/camera", HTTP_PUT, [this]() { handleCamera(); });
+  server.on("/system", HTTP_GET, [this]() { handleSystem(); });
+  server.on("/status", HTTP_GET, [this]() { handleStatus(); } );
+  server.on("/config", HTTP_GET, [this]() { handleConfig();} );
   ElegantOTA.begin(&server); 
   server.begin(32231);
 }
 
 void CarWebServer::handleSetMotorPWM() {
-  if (server.hasArg("plain") == false) {
-    server.send(404, "text/plain", "Body not found");
-    return;
-  }
+    if (server.hasArg("plain") == false) {
+        server.send(404, "text/plain", "Body not found");
+        return;
+    }
 
-  DynamicJsonDocument doc(1024);
-  deserializeJson(doc, server.arg("plain"));
-  
-  if (doc.containsKey("pwm") && doc.containsKey("motor")) {
-    MotorSelection selection = static_cast<MotorSelection>(int(doc["motor"]));
-    carController.setMotorSpeed(selection, doc["pwm"]);
-  
-  }
-  server.send(204);
+    auto j = json::parse(server.arg("plain").c_str());
+
+    if (j.contains("pwm") && j.contains("motor")) {
+        MotorSelection selection = static_cast<MotorSelection>(j["motor"].get<int>());
+        carController.setMotorSpeed(selection, j["pwm"]);
+    }
+    server.send(204);
 }
 
 void CarWebServer::handleMotorState() {
-  DynamicJsonDocument doc = asJSON(512, carController.getMotorState());
-  String response;
-  serializeJson(doc, response);
-  server.send(200, "application/json", response);
+  sendData(carController.getMotorState());
 }
-
 
 void CarWebServer::handleRoot() {
   server.send(200, "text/html", (const char*)control_index_html);
 }
 
 void CarWebServer::handleSetMotor() {
-  if (server.hasArg("plain") == false) {
-    server.send(404, "text/plain", "Body not found");
-    return;
-  }
+    if (server.hasArg("plain") == false) {
+        server.send(404, "text/plain", "Body not found");
+        return;
+    }
 
-  DynamicJsonDocument doc(1024);
-  deserializeJson(doc, server.arg("plain"));
-  
-  if (doc.containsKey("action") && doc.containsKey("motor")) {
-    MotorAction action = static_cast<MotorAction>(int(doc["action"]));
-    MotorSelection selection = static_cast<MotorSelection>(int(doc["motor"]));
-    carController.setMotorAction(action, selection);
-  }
+    auto j = json::parse(server.arg("plain").c_str());
 
-  server.send(204);
+    if (j.contains("action") && j.contains("motor")) {
+        MotorAction action = static_cast<MotorAction>(j["action"].get<int>());
+        MotorSelection selection = static_cast<MotorSelection>(j["motor"].get<int>());
+        carController.setMotorAction(action, selection);
+    }
+
+    server.send(204);
 }
 
 void CarWebServer::handleGetUltrasonic() {
-  float lastDistance = carController.getLastUltrasonicDistance();
-    DynamicJsonDocument doc(256);
-  doc["last_distance"] = lastDistance;
-  String response;
-  serializeJson(doc, response);
-  server.send(200, "application/json", response);
+  sendData(carController.getUltrasonicState());
 }
 
 void CarWebServer::handleCamera() {
-    if (server.hasArg("plain") == false) {
-      server.send(404, "text/plain", "Body not found");
-      return;
+    if (!server.hasArg("plain")) {
+        server.send(404, "text/plain", "Body not found");
+        return;
     }
 
-    DynamicJsonDocument doc(1024);
+    auto j = json::parse(server.arg("plain").c_str());
+
     int res = 0;
-    deserializeJson(doc, server.arg("plain"));
-  
-    if (doc.containsKey("frame_size")) {
-      int size = static_cast<int>(int(doc["frame_size"]));
-      sensor_t *s = esp_camera_sensor_get();
-      if (s->pixformat == PIXFORMAT_JPEG) {
+
+    if (j.contains("frame_size")) {
+        int size = j["frame_size"].get<int>();
+        sensor_t *s = esp_camera_sensor_get();
+        if (s->pixformat == PIXFORMAT_JPEG) {
             res = s->set_framesize(s, (framesize_t)size);
-      }
+        }
     }
-    DynamicJsonDocument responseDoc(1024);
-    responseDoc["frame_size"] = res;
-    String response;
-    serializeJson(responseDoc, response);
+
+    json responseJ;
+    responseJ["frame_size"] = res;
+    String response = responseJ.dump().c_str();
     server.send(204, "application/json", response);
+}
+
+void CarWebServer::handleSystem() {
+  sendData(systemMonitor.getState());
+}
+
+void CarWebServer::handleStatus() {
+    std::map<std::string, std::any> result;
+    result["motor"] = carController.getMotorState();
+    result["ultrasonic"] = carController.getUltrasonicState();
+    result["system"] = systemMonitor.getState();
+    sendData(result);
+}
+
+void CarWebServer::handleConfig() {
+    sendData(configManager.getConfig());
 }
 
 void CarWebServer::handleClient() {
@@ -102,26 +108,42 @@ void CarWebServer::handleClient() {
   ElegantOTA.loop();
 }
 
-  DynamicJsonDocument CarWebServer::asJSON(size_t docSize, std::map<std::string, std::any> map) const {
-        DynamicJsonDocument doc(docSize);
+json CarWebServer::asJSON(const std::map<std::string, std::any>& map) const {
+    json j;
+    for (const auto& item : map) {
+        const auto& key = item.first;
+        const auto& value = item.second;
 
-        for (const auto& item : map) {
-            const auto& key = item.first;
-            const auto& value = item.second;
-
+        try {
+            j[key] = std::any_cast<String>(value).c_str();
+        } catch (const std::bad_any_cast&) {
             try {
-                // Try casting to String
-                doc[key.c_str()] = std::any_cast<String>(value);
+                j[key] = std::any_cast<std::string>(value);
             } catch (const std::bad_any_cast&) {
                 try {
-                    // If it fails, try casting to int
-                    doc[key.c_str()] = std::any_cast<int>(value);
+                    j[key] = std::any_cast<int>(value);
                 } catch (const std::bad_any_cast&) {
-                    // If both casts fail, you can handle the error here or ignore it.
-                    // Optionally handle other types.
+                    try {
+                        j[key] = std::any_cast<float>(value);
+                    } catch (const std::bad_any_cast&) {
+                        try {
+                            // This handles a nested std::map<std::string, std::any>
+                            j[key] = asJSON(std::any_cast<std::map<std::string, std::any>>(value));
+                        } catch (const std::bad_any_cast&) {
+                            // Handle other types or ignore.
+                        }
+                    }
                 }
             }
         }
-
-        return doc;
     }
+    return j;
+}
+
+
+
+void CarWebServer::sendData(const std::map<std::string, std::any>& dataMap, const String& responseType) {
+    json j = asJSON(dataMap);
+    String response = j.dump().c_str();
+    server.send(200, responseType.c_str(), response);
+}

@@ -36,8 +36,15 @@ bool ConfigManager::loadConfig() {
     return true;
 }
 
-std::map<std::string, std::string> ConfigManager::getConfig() {
-    return configData;
+std::map<std::string, std::any> ConfigManager::getConfig() {
+    
+    std::map<std::string, std::any> anyMap;
+    
+    for (const auto& [key, value] : configData) {
+        anyMap[key] = value; 
+    }
+
+    return anyMap;
 }
 
 std::string ConfigManager::getConfigValue(const std::string& key) {
