@@ -13,6 +13,7 @@ CarApplication::CarApplication()
     carController(wiFiConfigManager ,motorControl, ultraSonicManager),
     webServer(carController, config, systemMonitor),
     cameraManager(),
+    postSetupBroadcaster(new MDNSBroadcaster()),
     isSetupComplete(false)
 {}
 
@@ -36,6 +37,7 @@ void CarApplication::initializeWiFi() {
 void CarApplication::setupCompleted() {
   setupManager->stopServices();
   Serial.println("Wi-Fi connected. Setup completed!");
+  postSetupBroadcaster->begin();
   isSetupComplete = true;
 
   cameraManager.initialize();

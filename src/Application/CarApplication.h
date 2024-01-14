@@ -11,13 +11,13 @@
 #include "esp_camera.h"
 #include "Fs/FSImpl.h"
 #include "Monitor/SystemMonitor.h"
+#include "PostSetupBroadcaster/MDNSBroadcaster.h"
 
 void startCameraServer();
 
 class CarApplication {
 public:
   CarApplication();
-  //CarApplication(const CarApplicationConfig& config, ConfigManager& configMgr);
   void setup();
   void loop();
 
@@ -34,6 +34,7 @@ private:
   CarController carController;
   CarWebServer webServer;
   CameraManager cameraManager;
+  PostSetupAvailabilityBroadcaster* postSetupBroadcaster;
 
   bool isSetupComplete;
 
