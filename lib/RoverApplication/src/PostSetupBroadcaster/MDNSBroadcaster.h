@@ -7,7 +7,13 @@
 
 class MDNSBroadcaster : public PostSetupAvailabilityBroadcaster {
 public:
+    MDNSBroadcaster(const char *mdnsDiscoveryName);
     void begin() override;
+
+private:
+    const char *mdnsDiscoveryName;
+
 };
 
 #endif
+   

@@ -2,11 +2,9 @@
 #include "WiFiSetupManager.h"
 #include "CaptivePortalHTML.h"
 
-const char* ap_ssid = "EspRover";
-const char* ap_password = "123456789";
 
-WiFiSetupManager::WiFiSetupManager(WiFiConfigManager& cm) 
-    : configManager(cm), webServer(80) {}
+WiFiSetupManager::WiFiSetupManager(WiFiConfigManager& cm, const char *apSsid, const char *apPassword) 
+    : configManager(cm), apSsid(apSsid), apPassword(apPassword), webServer(80) {}
 
 void WiFiSetupManager::initialize(SetupCompleteCallback callback) {
     setupCompleteCallback = callback;
@@ -32,7 +30,7 @@ void WiFiSetupManager::initialize(SetupCompleteCallback callback) {
 
 void WiFiSetupManager::startAPMode() {
     WiFi.mode(WIFI_AP_STA);
-    WiFi.softAP(ap_ssid, ap_password);
+    WiFi.softAP(this->apSsid, this->apPassword);
 
     dnsServer.start(53, "*", WiFi.softAPIP());
     setupCaptivePortal();

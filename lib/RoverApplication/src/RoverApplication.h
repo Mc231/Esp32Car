@@ -17,7 +17,7 @@ void startCameraServer();
 
 class RoverApplication {
 public:
-  RoverApplication();
+  RoverApplication(const RoverApplicationConfig& cfg = RoverApplicationConfig());
   void setup();
   void loop();
 

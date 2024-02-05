@@ -1,5 +1,11 @@
 
 struct RoverApplicationConfig {
+    const char* apSsid;
+    const char* apPassword;
+    int setupServerPort;
+    int webServerPort;
+    const char* mdnsDiscoveryName;
+    int serialBaud;
     int leftMotorPin1;
     int leftMotorPin2;
     int leftMotorPwm;
@@ -10,7 +16,13 @@ struct RoverApplicationConfig {
     int ultrasonicPin2;
 
      RoverApplicationConfig() 
-        : leftMotorPin1(2),    // Initialize with default values
+        : apSsid("Rover"),
+          apPassword("123456789"), 
+          setupServerPort(80),
+          webServerPort(32231),
+          mdnsDiscoveryName("Rover"),
+          serialBaud(115200), 
+          leftMotorPin1(2), 
           leftMotorPin2(14),
           leftMotorPwm(4),
           rightMotorPin1(15),

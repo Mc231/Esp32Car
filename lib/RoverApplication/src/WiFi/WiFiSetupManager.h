@@ -9,13 +9,15 @@
 
 class WiFiSetupManager : public AbstractWiFiSetupManager {
 public:
-    WiFiSetupManager(WiFiConfigManager& configManager);
+    WiFiSetupManager(WiFiConfigManager& configManager, const char *apSsid, const char *apPassword);
 
     void initialize(SetupCompleteCallback callback) override;
     void handleClient() override;
     void stopServices() override;
 
 private:
+    const char *apSsid;
+    const char *apPassword;
     WiFiConfigManager& configManager;
     DNSServer dnsServer;
     WebServer webServer;

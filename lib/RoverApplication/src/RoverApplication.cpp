@@ -1,11 +1,11 @@
 #include "RoverApplication.h"
 
-RoverApplication::RoverApplication()
+RoverApplication::RoverApplication(const RoverApplicationConfig& cfg)
   : systemMonitor(),
     abstractFs(new FSImpl()),
-    config(RoverApplicationConfig()),
+    config(cfg),
     wiFiConfigManager(*abstractFs),
-    setupManager(new WiFiSetupManager(wiFiConfigManager)),
+    setupManager(new WiFiSetupManager(wiFiConfigManager, config.apSsid, config.apPassword)),
     leftMotor(config.leftMotorPin1, config.leftMotorPin2, config.leftMotorPwm),  
     rightMotor(config.rightMotorPin1, config.rightMotorPin2, config.rightMotorPwm), 
     motorControl(leftMotor, rightMotor), 
@@ -13,12 +13,12 @@ RoverApplication::RoverApplication()
     carController(wiFiConfigManager ,motorControl, ultraSonicManager),
     webServer(carController, config, systemMonitor),
     cameraManager(),
-    postSetupBroadcaster(new MDNSBroadcaster()),
+    postSetupBroadcaster(new MDNSBroadcaster(config.mdnsDiscoveryName)),
     isSetupComplete(false)
 {}
 
 void RoverApplication::setup() {
-  Serial.begin(115200);
+  Serial.begin(this->config.serialBaud);
   initializeWiFi();
 }
 
@@ -45,5 +45,4 @@ void RoverApplication::setupCompleted() {
   webServer.begin();
   startCameraServer();
   //ultraSonicManager.initialize();
-  
 }

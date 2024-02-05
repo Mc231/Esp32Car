@@ -2,7 +2,7 @@
 #include "Html/control_html.h"
 
 RoverWebServer::RoverWebServer(RoverController& carController, RoverApplicationConfig config, SystemMonitor&)
-  : carController(carController), config(config), systemMonitor(systemMonitor), server(32231) 
+  : carController(carController), config(config), systemMonitor(systemMonitor), server(config.webServerPort) 
 {}
  
 void RoverWebServer::begin() {
@@ -18,7 +18,7 @@ void RoverWebServer::begin() {
   server.on("/system", HTTP_GET, [this]() { handleSystem(); });
   server.on("/status", HTTP_GET, [this]() { handleStatus(); } );
   server.on("/config", HTTP_GET, [this]() { handleConfig();} );
-  server.begin(32231);
+  server.begin(config.webServerPort);
 }
 
 void RoverWebServer::handleSetMotorPWM() {

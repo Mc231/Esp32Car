@@ -1,8 +1,10 @@
 // MDNSBroadcaster.cpp
 #include "MDNSBroadcaster.h"
 
+MDNSBroadcaster::MDNSBroadcaster(const char *mdnsDiscoveryName): mdnsDiscoveryName(mdnsDiscoveryName) { }
+
 void MDNSBroadcaster::begin() {
-    if (!MDNS.begin("rover")) {
+    if (!MDNS.begin(this->mdnsDiscoveryName)) {
         Serial.println("Error setting up MDNS responder!");
         return;
     } 
