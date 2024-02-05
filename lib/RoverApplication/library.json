@@ -1,7 +1,7 @@
 {
-    "name": "CarApplication",
+    "name": "RoverApplication",
     "version": "1.0.0",
-    "description": "A brief library for building esp 32 based car application",
+    "description": "A brief library for building esp 32 based Rover",
     "authors": [
       {
         "name": "Volodymyr Shyrochuk",

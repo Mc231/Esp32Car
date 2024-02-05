@@ -1,12 +1,12 @@
 #include <Arduino.h>
-#include <CarApplication.h>
+#include <RoverApplication.h>
 
-CarApplication carApp;
+RoverApplication roverApp;
 
 void setup() {;
-  carApp.setup();
+  roverApp.setup();
 }
 
 void loop() {
-  carApp.loop();
+  roverApp.loop();
 }
