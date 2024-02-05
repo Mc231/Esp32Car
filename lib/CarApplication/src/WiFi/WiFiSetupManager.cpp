@@ -2,7 +2,7 @@
 #include "WiFiSetupManager.h"
 #include "CaptivePortalHTML.h"
 
-const char* ap_ssid = "EspCar";
+const char* ap_ssid = "EspRover";
 const char* ap_password = "123456789";
 
 WiFiSetupManager::WiFiSetupManager(WiFiConfigManager& cm) 

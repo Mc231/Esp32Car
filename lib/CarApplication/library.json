@@ -1,0 +1,19 @@
+{
+    "name": "CarApplication",
+    "version": "1.0.0",
+    "description": "A brief library for building esp 32 based car application",
+    "authors": [
+      {
+        "name": "Volodymyr Shyrochuk",
+        "email": "vov4uks@gmail.com"
+      }
+    ],
+    "keywords": ["EspCar", "Rover2"],
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/Mc231/Esp32Car"
+    },
+    "license": "MIT",
+    "dependencies": []
+  }
+  
