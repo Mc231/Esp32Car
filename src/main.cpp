@@ -1,19 +1,12 @@
 #include <Arduino.h>
 #include <RoverApplication.h>
 
-RoverApplicationConfig customConfig;
-RoverApplication* roverApp = nullptr;
-
+RoverApplication roverApp;
 
 void setup() {;
-  customConfig.ultrasonicSensorEnabled = true;
-  customConfig.mdnsDiscoveryName = "RoverCar";
-  roverApp = new RoverApplication(customConfig);
-  roverApp->setup();
+  roverApp.setup();
 }
 
 void loop() {
-  if (roverApp != nullptr) {
-    roverApp->loop();
-  }
+  roverApp.loop();
 }

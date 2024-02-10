@@ -4,7 +4,6 @@
 MDNSBroadcaster::MDNSBroadcaster(const char *mdnsDiscoveryName): mdnsDiscoveryName(mdnsDiscoveryName) { }
 
 void MDNSBroadcaster::begin() {
-    Serial.println(this->mdnsDiscoveryName);
     if (!MDNS.begin(this->mdnsDiscoveryName)) {
         Serial.println("Error setting up MDNS responder!");
         return;
