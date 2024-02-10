@@ -14,6 +14,7 @@ struct RoverApplicationConfig {
     int rightMotorPwm;
     int ultrasonicPin1;
     int ultrasonicPin2;
+    bool ultrasonicSensorEnabled;
 
      RoverApplicationConfig() 
         : apSsid("Rover"),
@@ -29,5 +30,6 @@ struct RoverApplicationConfig {
           rightMotorPin2(13),
           rightMotorPwm(12),
           ultrasonicPin1(3),
-          ultrasonicPin2(1) {}
+          ultrasonicPin2(1),
+          ultrasonicSensorEnabled(true) { }
 };

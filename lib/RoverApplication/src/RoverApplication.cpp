@@ -44,5 +44,8 @@ void RoverApplication::setupCompleted() {
 
   webServer.begin();
   startCameraServer();
-  //ultraSonicManager.initialize();
+  if (this->config.ultrasonicSensorEnabled) 
+  {
+    ultraSonicManager.initialize();
+  }
 }
