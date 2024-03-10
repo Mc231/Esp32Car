@@ -12,6 +12,7 @@ RoverApplication::RoverApplication(const RoverApplicationConfig& cfg)
     ultraSonicManager(config.ultrasonicPin1, config.ultrasonicPin2),
     carController(wiFiConfigManager ,motorControl, ultraSonicManager),
     webServer(carController, config, systemMonitor),
+    webSocketServer(carController, config, systemMonitor),
     cameraManager(),
     postSetupBroadcaster(new MDNSBroadcaster(config.mdnsDiscoveryName)),
     isSetupComplete(false)
@@ -27,6 +28,7 @@ void RoverApplication::loop() {
         setupManager->handleClient();
     } else {
        webServer.handleClient();
+       webSocketServer.loop();
     }
 }
 
@@ -43,6 +45,7 @@ void RoverApplication::setupCompleted() {
   cameraManager.initialize();
 
   webServer.begin();
+  webSocketServer.begin();
   startCameraServer();
   if (this->config.ultrasonicSensorEnabled) 
   {

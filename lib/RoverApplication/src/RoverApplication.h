@@ -4,6 +4,7 @@
 #include "WiFi/WiFiSetupManager.h"
 #include "WiFi/WiFiConfigManager.h"
 #include "RoverWebServer/RoverWebServer.h"
+#include "RoverWebSocket/RoverWebSocketServer.h"
 #include "Control/MotorControl.h"
 #include "Manager/UltrasonicManager.h"
 #include "Camera/CameraManager.h"
@@ -33,6 +34,7 @@ private:
   UltrasonicManager ultraSonicManager;
   RoverController carController;
   RoverWebServer webServer;
+  RoverWebSocketServer webSocketServer;
   CameraManager cameraManager;
   PostSetupAvailabilityBroadcaster* postSetupBroadcaster;
 

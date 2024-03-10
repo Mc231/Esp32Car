@@ -44,8 +44,8 @@ void RoverWebServer::handleReboot() {
 }
 
 void RoverWebServer::handleGetWiFi() {
-    String response = carController.getWiFiConfig();
-    server.send(200, "application/json", response);
+    auto wifiConfigMap = carController.getWiFiConfig();
+    sendData(wifiConfigMap);
 }
 
 void RoverWebServer::handleWiFiForget() {

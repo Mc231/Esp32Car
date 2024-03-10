@@ -14,7 +14,7 @@ public:
   void reboot();
   void setMotorSpeed(MotorSelection motorSelection, int speed);
   void setMotorAction(MotorAction action, MotorSelection motorSelection);
-  String getWiFiConfig();
+  std::map<std::string, std::any> getWiFiConfig();
   std::map<std::string, std::any> getMotorState();
   std::map<std::string, std::any> getUltrasonicState();
 private:

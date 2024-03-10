@@ -1,9 +1,13 @@
 
+#ifndef ROVERAPPLICATIONCONFIG_H
+#define ROVERAPPLICATIONCONFIG_H
+
 struct RoverApplicationConfig {
     const char* apSsid;
     const char* apPassword;
     int setupServerPort;
     int webServerPort;
+    int webSocketPort;
     const char* mdnsDiscoveryName;
     int serialBaud;
     int leftMotorPin1;
@@ -21,6 +25,7 @@ struct RoverApplicationConfig {
           apPassword("123456789"), 
           setupServerPort(80),
           webServerPort(32231),
+          webSocketPort(32232),
           mdnsDiscoveryName("Rover"),
           serialBaud(115200), 
           leftMotorPin1(2), 
@@ -33,3 +38,5 @@ struct RoverApplicationConfig {
           ultrasonicPin2(1),
           ultrasonicSensorEnabled(true) { }
 };
+
+#endif // ROVERAPPLICATIONCONFIG_H

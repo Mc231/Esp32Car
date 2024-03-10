@@ -14,13 +14,11 @@ RoverController::RoverController(WiFiConfigManager& wiFiConfigManager, MotorCont
     ESP.restart();
   }
 
-  String RoverController::getWiFiConfig() {
+  std::map<std::string, std::any> RoverController::getWiFiConfig() {
     auto config = wiFiConfigManager.readConfig();
-    IPAddress ip = WiFi.localIP(); // Get local IP address
+    IPAddress ip = WiFi.localIP();
     String ipAddress = String(ip[0]) + '.' + String(ip[1]) + '.' + String(ip[2]) + '.' + String(ip[3]);
-
-    // Construct and return the JSON string
-    return "{\"ssid\":\"" + config.ssid + "\", \"ip\":\"" + ipAddress + "\"}";
+    return {{"ssid", config.ssid}, {"ip", ipAddress}};
   }
 
   void RoverController::setMotorSpeed(MotorSelection motorSelection, int speed) {
