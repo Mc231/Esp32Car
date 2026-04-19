@@ -28,6 +28,9 @@ public:
   void handleSystem();
   void handleStatus();
   void handleConfig();
+  void handleOtaPage();
+  void handleOtaUpload();
+  void handleOtaUploadFinish();
 private:
   RoverController &carController;
   RoverApplicationConfig config;

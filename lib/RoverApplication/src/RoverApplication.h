@@ -13,6 +13,7 @@
 #include "Fs/FSImpl.h"
 #include "Monitor/SystemMonitor.h"
 #include "PostSetupBroadcaster/MDNSBroadcaster.h"
+#include "Ota/OTAManager.h"
 
 void startCameraServer();
 
@@ -37,6 +38,7 @@ private:
   RoverWebSocketServer webSocketServer;
   CameraManager cameraManager;
   PostSetupAvailabilityBroadcaster* postSetupBroadcaster;
+  OTAManager otaManager;
 
   bool isSetupComplete;
 

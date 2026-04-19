@@ -526,6 +526,7 @@ const char control_index_html[] PROGMEM = R"rawliteral(
 
     <div class="section-label">Actions</div>
     <button class="ghost" id="refreshInfoBtn">Refresh Info</button>
+    <button class="ghost" onclick="window.open('/ota','_blank')">Update Firmware (OTA)</button>
     <button class="ghost" id="forgetBtn">Forget Wi-Fi</button>
     <button class="danger" id="rebootBtn2">Reboot Rover</button>
   </div>
@@ -723,8 +724,8 @@ const char control_index_html[] PROGMEM = R"rawliteral(
     if (act === 'forward')  return motor(0, 2);
     if (act === 'backward') return motor(1, 2);
     if (act === 'stop')     return motor(2, 2);
-    if (act === 'left')     { motor(2, 1); return motor(0, 0); }   // left = right wheel forward, left wheel stops
-    if (act === 'right')    { motor(2, 0); return motor(0, 1); }   // right = left wheel forward, right wheel stops
+    if (act === 'left')     { motor(2, 0); return motor(0, 1); }   // turn left: stop left wheel, drive right wheel forward
+    if (act === 'right')    { motor(2, 1); return motor(0, 0); }   // turn right: stop right wheel, drive left wheel forward
   }
 
   // ===== D-pad bindings (touch + mouse) =====

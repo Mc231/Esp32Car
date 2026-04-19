@@ -17,8 +17,10 @@ RoverApplication::RoverApplication(const RoverApplicationConfig& cfg)
     postSetupBroadcaster(new MDNSBroadcaster(config.mdnsDiscoveryName, {
         {"http",       "tcp", 80},
         {"rover-ctrl", "tcp", static_cast<uint16_t>(config.webServerPort)},
-        {"rover-ws",   "tcp", static_cast<uint16_t>(config.webSocketPort)}
+        {"rover-ws",   "tcp", static_cast<uint16_t>(config.webSocketPort)},
+        {"arduino",    "tcp", 3232}                                            // ArduinoOTA
     })),
+    otaManager(config.mdnsDiscoveryName, config.adminPassword),
     isSetupComplete(false)
 {}
 
@@ -33,6 +35,7 @@ void RoverApplication::loop() {
     } else {
        webServer.handleClient();
        webSocketServer.loop();
+       otaManager.loop();
        if (this->config.ultrasonicSensorEnabled) {
          ultraSonicManager.update();
        }
@@ -59,7 +62,8 @@ void RoverApplication::setupCompleted() {
   webServer.begin();
   webSocketServer.begin();
   startCameraServer();
-  if (this->config.ultrasonicSensorEnabled) 
+  otaManager.begin();
+  if (this->config.ultrasonicSensorEnabled)
   {
     ultraSonicManager.initialize();
   }
