@@ -23,6 +23,9 @@ struct RoverApplicationConfig {
     // Both empty = auth disabled.
     const char* adminUser;
     const char* adminPassword;
+    // Deadman: auto-stop motors if no driving command arrives within this window.
+    // 0 = disabled. Default: 1500 ms.
+    unsigned long deadmanTimeoutMs;
 
      RoverApplicationConfig()
         : apSsid("Rover"),
@@ -42,7 +45,8 @@ struct RoverApplicationConfig {
           ultrasonicPin2(33),
           ultrasonicSensorEnabled(false),
           adminUser(""),
-          adminPassword("") { }
+          adminPassword(""),
+          deadmanTimeoutMs(1500) { }
 };
 
 #endif // ROVERAPPLICATIONCONFIG_H

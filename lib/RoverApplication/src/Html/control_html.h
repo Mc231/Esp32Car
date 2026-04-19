@@ -727,14 +727,39 @@ const char control_index_html[] PROGMEM = R"rawliteral(
 
   // ===== D-pad bindings (touch + mouse) =====
   const buttons = document.querySelectorAll('.dpad button');
+  let heldAction = null;        // current held button's action
+  let keepaliveTimer = null;    // re-sends the command to feed the rover's deadman
+
+  function startKeepalive(act) {
+    heldAction = act;
+    clearInterval(keepaliveTimer);
+    keepaliveTimer = setInterval(() => { if (heldAction) dispatch(heldAction); }, 700);
+  }
+  function stopKeepalive() {
+    heldAction = null;
+    clearInterval(keepaliveTimer);
+    keepaliveTimer = null;
+  }
+
   const releaseAll = () => {
     buttons.forEach(b => b.classList.remove('active'));
+    stopKeepalive();
     motor(2, 2);
   };
+
   buttons.forEach(btn => {
     const act = btn.dataset.act;
-    const press = e => { e.preventDefault(); btn.classList.add('active'); dispatch(act); };
-    const release = e => { e.preventDefault(); btn.classList.remove('active'); if (act !== 'stop') motor(2, 2); };
+    const press = e => {
+      e.preventDefault();
+      btn.classList.add('active');
+      dispatch(act);
+      if (act !== 'stop') startKeepalive(act);
+    };
+    const release = e => {
+      e.preventDefault();
+      btn.classList.remove('active');
+      if (act !== 'stop') { stopKeepalive(); motor(2, 2); }
+    };
     btn.addEventListener('pointerdown', press);
     btn.addEventListener('pointerup', release);
     btn.addEventListener('pointerleave', release);
@@ -751,13 +776,14 @@ const char control_index_html[] PROGMEM = R"rawliteral(
     e.preventDefault();
     document.querySelector('.dpad .' + ({forward:'up',backward:'down',left:'left',right:'right',stop:'stop'}[act]))?.classList.add('active');
     dispatch(act);
+    if (act !== 'stop') startKeepalive(act);
   });
   document.addEventListener('keyup', e => {
     if (!keyMap[e.key]) return;
     pressed.delete(e.key);
     const act = keyMap[e.key];
     document.querySelector('.dpad .' + ({forward:'up',backward:'down',left:'left',right:'right',stop:'stop'}[act]))?.classList.remove('active');
-    if (act !== 'stop') motor(2, 2);
+    if (act !== 'stop') { stopKeepalive(); motor(2, 2); }
   });
   window.addEventListener('blur', releaseAll);
 

@@ -26,6 +26,8 @@ RoverApplication::RoverApplication(const RoverApplicationConfig& cfg)
 
 void RoverApplication::setup() {
   Serial.begin(this->config.serialBaud);
+  Serial.printf("\nRover firmware build %s %s\n", __DATE__, __TIME__);
+  Serial.println("OTA TEST BUILD v2");
   initializeWiFi();
 }
 
@@ -36,6 +38,7 @@ void RoverApplication::loop() {
        webServer.handleClient();
        webSocketServer.loop();
        otaManager.loop();
+       carController.tickDeadman();
        if (this->config.ultrasonicSensorEnabled) {
          ultraSonicManager.update();
        }
@@ -63,6 +66,7 @@ void RoverApplication::setupCompleted() {
   webSocketServer.begin();
   startCameraServer();
   otaManager.begin();
+  carController.setDeadmanTimeout(this->config.deadmanTimeoutMs);
   if (this->config.ultrasonicSensorEnabled)
   {
     ultraSonicManager.initialize();

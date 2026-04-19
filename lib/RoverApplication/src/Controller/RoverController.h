@@ -19,11 +19,19 @@ public:
   std::map<std::string, std::any> getWiFiConfig();
   std::map<std::string, std::any> getMotorState();
   std::map<std::string, std::any> getUltrasonicState();
+
+  // Deadman: call from the main loop. If no driving command has arrived
+  // within deadmanTimeoutMs the motors are stopped. 0 = disabled.
+  void setDeadmanTimeout(unsigned long timeoutMs) { deadmanTimeoutMs = timeoutMs; }
+  void tickDeadman();
 private:
   WiFiConfigManager& wiFiConfigManager;
   MotorControl& motorControl;
   UltrasonicManager& ultrasonicManager;
   SemaphoreHandle_t stateMutex;
+  unsigned long lastCommandMs = 0;
+  unsigned long deadmanTimeoutMs = 0;
+  bool motorsActive = false;
 
   // RAII helper for the mutex.
   struct Lock {

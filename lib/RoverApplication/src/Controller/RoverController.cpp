@@ -29,11 +29,30 @@ std::map<std::string, std::any> RoverController::getWiFiConfig() {
 void RoverController::setMotorSpeed(MotorSelection motorSelection, int speed) {
   Lock lk(stateMutex);
   motorControl.setPWM(motorSelection, speed);
+  // PWM change while moving counts as a fresh command — keeps the deadman happy.
+  if (motorsActive) lastCommandMs = millis();
 }
 
 void RoverController::setMotorAction(MotorAction action, MotorSelection motorSelection) {
   Lock lk(stateMutex);
   motorControl.action(action, motorSelection);
+  if (action == STOP) {
+    motorsActive = false;
+  } else {
+    motorsActive = true;
+    lastCommandMs = millis();
+  }
+}
+
+void RoverController::tickDeadman() {
+  if (deadmanTimeoutMs == 0) return;
+  Lock lk(stateMutex);
+  if (!motorsActive) return;
+  if (millis() - lastCommandMs > deadmanTimeoutMs) {
+    motorControl.action(STOP, ALL);
+    motorsActive = false;
+    Serial.println("Deadman: no command, motors stopped");
+  }
 }
 
 std::map<std::string, std::any> RoverController::getMotorState() {
