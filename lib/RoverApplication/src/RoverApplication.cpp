@@ -21,7 +21,7 @@ RoverApplication::RoverApplication(const RoverApplicationConfig& cfg)
         {"http",       "tcp", 80},
         {"rover-ctrl", "tcp", static_cast<uint16_t>(config.webServerPort)},
         {"rover-ws",   "tcp", static_cast<uint16_t>(config.webSocketPort)},
-        {"arduino",    "tcp", 3232},                                           // ArduinoOTA
+        // _arduino._tcp is registered by ArduinoOTA itself with required TXT records
         {"telnet",     "tcp", 23}                                              // remote serial log
     })),
     otaManager(config.mdnsDiscoveryName, config.adminPassword),
