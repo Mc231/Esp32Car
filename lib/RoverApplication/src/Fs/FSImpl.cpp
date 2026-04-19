@@ -3,7 +3,8 @@
 #include <FS.h>  
 
 bool FSImpl::begin() {
-    return SPIFFS.begin();
+    // Format on first-use / after a partition layout change.
+    return SPIFFS.begin(true);
 }
 
 void FSImpl::end() {

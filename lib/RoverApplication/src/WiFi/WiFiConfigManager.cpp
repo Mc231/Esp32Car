@@ -1,13 +1,24 @@
 // WiFiConfigManager.cpp
 #include "WiFiConfigManager.h"
 
-WiFiConfigManager::WiFiConfigManager(AbstractFS& fs) : fileSystem(fs), isConfigCached(false) {
-    fileSystem.begin();
+WiFiConfigManager::WiFiConfigManager(AbstractFS& fs) : fileSystem(fs), isConfigCached(false), fsMounted(false) {
+    // FS mount deferred to ensureMounted(): SPIFFS.begin(true) needs FreeRTOS,
+    // but this constructor runs at C++ static-init (before setup()).
+}
+
+void WiFiConfigManager::ensureMounted() {
+    if (!fsMounted) {
+        fsMounted = fileSystem.begin();
+        if (!fsMounted) {
+            Serial.println("WiFiConfigManager: filesystem mount failed");
+        }
+    }
 }
 
 WiFiConfigManager::Config WiFiConfigManager::readConfig() {
+    ensureMounted();
     if (!isConfigCached) {
-        if (fileSystem.exists(WIFI_CONFIG_FILE)) {
+        if (fsMounted && fileSystem.exists(WIFI_CONFIG_FILE)) {
             File configFile = fileSystem.open(WIFI_CONFIG_FILE, "r");
             if (configFile) {
                 while (configFile.available()) {
@@ -29,6 +40,8 @@ WiFiConfigManager::Config WiFiConfigManager::readConfig() {
 }
 
 void WiFiConfigManager::saveConfig(const String& ssid, const String& password) {
+    ensureMounted();
+    if (!fsMounted) return;
     File configFile = fileSystem.open(WIFI_CONFIG_FILE, "w");
     if (configFile) {
         configFile.println(ssid);
@@ -42,17 +55,18 @@ void WiFiConfigManager::saveConfig(const String& ssid, const String& password) {
 }
 
 void WiFiConfigManager::clearConfig() {
-    if (fileSystem.begin()) {
-        if (fileSystem.exists(WIFI_CONFIG_FILE)) {
-            fileSystem.remove(WIFI_CONFIG_FILE);
-            Serial.println("WI-FI config configuration cleared.");
-            isConfigCached = false; // Invalidate the cache
-        } else {
-            Serial.println("No WI-FI config configuration to clear.");
-        }
-        fileSystem.end();
-    } else {
+    ensureMounted();
+    if (!fsMounted) {
         Serial.println("Failed to initialize file system for clearing WI-FI config.");
+        return;
+    }
+    if (fileSystem.exists(WIFI_CONFIG_FILE)) {
+        fileSystem.remove(WIFI_CONFIG_FILE);
+        Serial.println("WI-FI config configuration cleared.");
+        isConfigCached = false;
+        cachedConfig = Config{};
+    } else {
+        Serial.println("No WI-FI config configuration to clear.");
     }
 }
 

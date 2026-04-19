@@ -21,7 +21,9 @@ private:
     static constexpr const char* WIFI_CONFIG_FILE = "/wi_fi_config.cfg";
     AbstractFS& fileSystem;
     bool isConfigCached;
+    bool fsMounted;
     Config cachedConfig;
+    void ensureMounted();
     String trimString(const String& str);
 };
 
