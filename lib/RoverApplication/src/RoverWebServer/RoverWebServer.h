@@ -31,6 +31,8 @@ public:
   void handleOtaPage();
   void handleOtaUpload();
   void handleOtaUploadFinish();
+  void handleLogsPage();
+  void handleLogsData();
 private:
   RoverController &carController;
   RoverApplicationConfig config;

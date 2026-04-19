@@ -1,6 +1,7 @@
 // WiFiSetupManager.cpp
 #include "WiFiSetupManager.h"
 #include "CaptivePortalHTML.h"
+#include "Log/RemoteLogger.h"
 
 
 WiFiSetupManager::WiFiSetupManager(WiFiConfigManager& cm, const char *apSsid, const char *apPassword) 
@@ -14,16 +15,16 @@ void WiFiSetupManager::initialize(SetupCompleteCallback callback) {
         WiFi.begin(config.ssid.c_str(), config.password.c_str());
 
         if (WiFi.waitForConnectResult() != WL_CONNECTED) {
-            Serial.println("Failed to connect. Entering setup mode...");
+            Log.println("Failed to connect. Entering setup mode...");
             startAPMode();
         } else {
-            Serial.println("Connected to Wi-Fi.");
+            Log.println("Connected to Wi-Fi.");
             if (setupCompleteCallback) {
                 setupCompleteCallback();
             }
         }
     } else {
-        Serial.println("Entering setup mode...");
+        Log.println("Entering setup mode...");
         startAPMode();
     }
 }
@@ -35,7 +36,7 @@ void WiFiSetupManager::startAPMode() {
     dnsServer.start(53, "*", WiFi.softAPIP());
     setupCaptivePortal();
 
-    Serial.println("AP Mode and Captive Portal started.");
+    Log.println("AP Mode and Captive Portal started.");
 }
 
 void WiFiSetupManager::setupCaptivePortal() {
@@ -65,7 +66,7 @@ void WiFiSetupManager::handleClient() {
 void WiFiSetupManager::stopServices() {
     dnsServer.stop();
     webServer.stop();
-    Serial.println("HTTP server and DNS server stopped.");
+    Log.println("HTTP server and DNS server stopped.");
 }
 
 void WiFiSetupManager::handleScanNetworks() {
@@ -74,7 +75,7 @@ void WiFiSetupManager::handleScanNetworks() {
     delay(100);
 
     int n = WiFi.scanNetworks(false, true);
-    Serial.printf("scanNetworks found %d\n", n);
+    Log.printf("scanNetworks found %d\n", n);
 
     String json = "[";
     for (int i = 0; i < n; ++i) {
@@ -99,7 +100,7 @@ void WiFiSetupManager::handleConnectToNetwork() {
         while (WiFi.status() != WL_CONNECTED && count < 30) {
             delay(1000);
             count++;
-            Serial.print(".");
+            Log.print(".");
         }
         
     if (WiFi.status() == WL_CONNECTED) {

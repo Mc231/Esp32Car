@@ -1,5 +1,6 @@
 // WiFiConfigManager.cpp
 #include "WiFiConfigManager.h"
+#include "Log/RemoteLogger.h"
 
 WiFiConfigManager::WiFiConfigManager(AbstractFS& fs) : fileSystem(fs), isConfigCached(false), fsMounted(false) {
     // FS mount deferred to ensureMounted(): SPIFFS.begin(true) needs FreeRTOS,
@@ -10,7 +11,7 @@ void WiFiConfigManager::ensureMounted() {
     if (!fsMounted) {
         fsMounted = fileSystem.begin();
         if (!fsMounted) {
-            Serial.println("WiFiConfigManager: filesystem mount failed");
+            Log.println("WiFiConfigManager: filesystem mount failed");
         }
     }
 }
@@ -57,16 +58,16 @@ void WiFiConfigManager::saveConfig(const String& ssid, const String& password) {
 void WiFiConfigManager::clearConfig() {
     ensureMounted();
     if (!fsMounted) {
-        Serial.println("Failed to initialize file system for clearing WI-FI config.");
+        Log.println("Failed to initialize file system for clearing WI-FI config.");
         return;
     }
     if (fileSystem.exists(WIFI_CONFIG_FILE)) {
         fileSystem.remove(WIFI_CONFIG_FILE);
-        Serial.println("WI-FI config configuration cleared.");
+        Log.println("WI-FI config configuration cleared.");
         isConfigCached = false;
         cachedConfig = Config{};
     } else {
-        Serial.println("No WI-FI config configuration to clear.");
+        Log.println("No WI-FI config configuration to clear.");
     }
 }
 

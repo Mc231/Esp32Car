@@ -1,5 +1,8 @@
 #include "RoverApplication.h"
 
+// Global logger — Serial + telnet on port 23 once Wi-Fi is up.
+RemoteLogger Log(23);
+
 RoverApplication::RoverApplication(const RoverApplicationConfig& cfg)
   : systemMonitor(),
     abstractFs(new FSImpl()),
@@ -18,7 +21,8 @@ RoverApplication::RoverApplication(const RoverApplicationConfig& cfg)
         {"http",       "tcp", 80},
         {"rover-ctrl", "tcp", static_cast<uint16_t>(config.webServerPort)},
         {"rover-ws",   "tcp", static_cast<uint16_t>(config.webSocketPort)},
-        {"arduino",    "tcp", 3232}                                            // ArduinoOTA
+        {"arduino",    "tcp", 3232},                                           // ArduinoOTA
+        {"telnet",     "tcp", 23}                                              // remote serial log
     })),
     otaManager(config.mdnsDiscoveryName, config.adminPassword),
     isSetupComplete(false)
@@ -26,8 +30,8 @@ RoverApplication::RoverApplication(const RoverApplicationConfig& cfg)
 
 void RoverApplication::setup() {
   Serial.begin(this->config.serialBaud);
-  Serial.printf("\nRover firmware build %s %s\n", __DATE__, __TIME__);
-  Serial.println("OTA TEST BUILD v2");
+  Log.printf("\nRover firmware build %s %s\n", __DATE__, __TIME__);
+  Log.println("OTA TEST BUILD v2");
   initializeWiFi();
 }
 
@@ -38,6 +42,7 @@ void RoverApplication::loop() {
        webServer.handleClient();
        webSocketServer.loop();
        otaManager.loop();
+       Log.loop();
        carController.tickDeadman();
        if (this->config.ultrasonicSensorEnabled) {
          ultraSonicManager.update();
@@ -51,12 +56,12 @@ void RoverApplication::initializeWiFi() {
 
 void RoverApplication::setupCompleted() {
   setupManager->stopServices();
-  Serial.print("Wi-Fi connected. IP: ");
-  Serial.print(WiFi.localIP());
-  Serial.print("  mDNS: http://");
-  Serial.print(this->config.mdnsDiscoveryName);
-  Serial.print(".local:");
-  Serial.println(this->config.webServerPort);
+  Log.begin();
+  Log.printf("Wi-Fi connected. IP: %s  mDNS: http://%s.local:%d\n",
+             WiFi.localIP().toString().c_str(),
+             this->config.mdnsDiscoveryName,
+             this->config.webServerPort);
+  Log.printf("Telnet log: nc %s 23\n", WiFi.localIP().toString().c_str());
   postSetupBroadcaster->begin();
   isSetupComplete = true;
 

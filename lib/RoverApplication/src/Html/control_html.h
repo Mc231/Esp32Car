@@ -523,6 +523,7 @@ const char control_index_html[] PROGMEM = R"rawliteral(
 
     <div class="section-label">Actions</div>
     <button class="ghost" id="refreshInfoBtn">Refresh Info</button>
+    <button class="ghost" onclick="window.open('/logs','_blank')">Live Logs</button>
     <button class="ghost" onclick="window.open('/ota','_blank')">Update Firmware (OTA)</button>
     <button class="ghost" id="forgetBtn">Forget Wi-Fi</button>
     <button class="danger" id="rebootBtn2">Reboot Rover</button>

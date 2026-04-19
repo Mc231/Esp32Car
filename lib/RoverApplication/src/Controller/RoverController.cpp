@@ -1,5 +1,6 @@
 #include "RoverController.h"
 #include <WiFi.h>
+#include "Log/RemoteLogger.h"
 
 RoverController::RoverController(WiFiConfigManager& wiFiConfigManager, MotorControl& motorControl, UltrasonicManager& ultrasonicManager)
   : wiFiConfigManager(wiFiConfigManager),
@@ -51,7 +52,7 @@ void RoverController::tickDeadman() {
   if (millis() - lastCommandMs > deadmanTimeoutMs) {
     motorControl.action(STOP, ALL);
     motorsActive = false;
-    Serial.println("Deadman: no command, motors stopped");
+    Log.println("Deadman: no command, motors stopped");
   }
 }
 

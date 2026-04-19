@@ -1,5 +1,6 @@
 #include "RoverWebServer.h"
 #include "Html/control_html.h"
+#include "Log/RemoteLogger.h"
 #include <Update.h>
 
 RoverWebServer::RoverWebServer(RoverController& carController, RoverApplicationConfig config, SystemMonitor&)
@@ -36,6 +37,8 @@ void RoverWebServer::begin() {
     [this]() { handleOtaUploadFinish(); },
     [this]() { handleOtaUpload(); }
   );
+  server.on("/logs", HTTP_GET, [this]() { handleLogsPage(); });
+  server.on("/logs/data", HTTP_GET, [this]() { handleLogsData(); });
   server.begin(config.webServerPort);
 }
 
@@ -88,7 +91,7 @@ void RoverWebServer::handleOtaUpload() {
   if (!authorized()) return;
   HTTPUpload& upload = server.upload();
   if (upload.status == UPLOAD_FILE_START) {
-    Serial.printf("OTA: receiving %s\n", upload.filename.c_str());
+    Log.printf("OTA: receiving %s\n", upload.filename.c_str());
     if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
       Update.printError(Serial);
     }
@@ -98,7 +101,7 @@ void RoverWebServer::handleOtaUpload() {
     }
   } else if (upload.status == UPLOAD_FILE_END) {
     if (Update.end(true)) {
-      Serial.printf("OTA: %u bytes written\n", upload.totalSize);
+      Log.printf("OTA: %u bytes written\n", upload.totalSize);
     } else {
       Update.printError(Serial);
     }
@@ -113,6 +116,98 @@ void RoverWebServer::handleOtaUploadFinish() {
     delay(500);
     ESP.restart();
   }
+}
+
+static const char LOGS_PAGE[] PROGMEM = R"rawliteral(
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rover Logs</title>
+<style>
+:root{--bg:#0b1020;--card:#131a30;--border:#2a345a;--text:#e7ebf5;--dim:#8a93b3;--accent:#5b8cff;}
+*{box-sizing:border-box}html,body{height:100%}
+body{margin:0;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:var(--text);background:var(--bg);display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--card)}
+h1{margin:0;font-size:15px;font-weight:650;flex:1}
+button,a.btn{background:var(--card);border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;text-decoration:none}
+button:hover,a.btn:hover{border-color:var(--accent)}
+button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--dim);display:inline-block;margin-right:5px}
+.dot.live{background:#3ddc84;box-shadow:0 0 6px #3ddc84;animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.4}}
+pre{flex:1;margin:0;padding:14px;overflow:auto;font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;color:var(--text);background:var(--bg);white-space:pre-wrap;word-break:break-word}
+pre::-webkit-scrollbar{width:8px}pre::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.bad{color:#ff6b6b}.warn{color:#ffb454}.ok{color:#3ddc84}
+</style></head><body>
+<header>
+<h1>Rover Logs</h1>
+<span><span class="dot" id="dot"></span><span id="status">connecting</span></span>
+<button id="pauseBtn">Pause</button>
+<button id="clearBtn">Clear</button>
+<a class="btn" href="/">&larr; Control</a>
+</header>
+<pre id="log"></pre>
+<script>
+const log=document.getElementById('log'),dot=document.getElementById('dot'),
+  st=document.getElementById('status'),pauseBtn=document.getElementById('pauseBtn'),
+  clearBtn=document.getElementById('clearBtn');
+let cursor=0,paused=false,timer=null,lastOk=0;
+function setLive(on){dot.classList.toggle('live',on);st.textContent=on?'live':'offline';}
+function colorize(line){if(/E \(|error|fail/i.test(line))return '<span class="bad">'+line+'</span>';
+  if(/W \(|warn/i.test(line))return '<span class="warn">'+line+'</span>';
+  if(/OTA: complete|connected|ready/i.test(line))return '<span class="ok">'+line+'</span>';
+  return line;}
+async function poll(){if(paused)return;
+  try{const r=await fetch('/logs/data?since='+cursor);
+    if(!r.ok)throw 0;
+    const j=await r.json();cursor=j.cursor;setLive(true);lastOk=Date.now();
+    if(j.data){const atBottom=log.scrollTop+log.clientHeight>=log.scrollHeight-30;
+      const lines=j.data.split(/\r?\n/);
+      let html='';for(const l of lines)if(l)html+=colorize(l.replace(/&/g,'&amp;').replace(/</g,'&lt;'))+'\n';
+      log.insertAdjacentHTML('beforeend',html);
+      if(log.textContent.length>200000)log.textContent=log.textContent.slice(-150000);
+      if(atBottom)log.scrollTop=log.scrollHeight;}}
+  catch(e){if(Date.now()-lastOk>3000)setLive(false);}}
+pauseBtn.addEventListener('click',()=>{paused=!paused;pauseBtn.textContent=paused?'Resume':'Pause';pauseBtn.classList.toggle('active',paused);});
+clearBtn.addEventListener('click',()=>log.textContent='');
+timer=setInterval(poll,500);poll();
+</script></body></html>
+)rawliteral";
+
+void RoverWebServer::handleLogsPage() {
+  if (!authorized()) return;
+  server.send_P(200, "text/html", LOGS_PAGE);
+}
+
+void RoverWebServer::handleLogsData() {
+  if (!authorized()) return;
+  size_t cursor = 0;
+  if (server.hasArg("since")) cursor = strtoul(server.arg("since").c_str(), nullptr, 10);
+  String data = Log.readSince(cursor);
+  // Build a minimal JSON manually to avoid serializing through asJSON.
+  String out;
+  out.reserve(data.length() + 64);
+  out += "{\"cursor\":";
+  out += String((unsigned long)Log.totalWritten());
+  out += ",\"data\":\"";
+  // JSON-escape backslashes, quotes, control chars
+  for (size_t i = 0; i < data.length(); ++i) {
+    char c = data[i];
+    switch (c) {
+      case '\\': out += "\\\\"; break;
+      case '"':  out += "\\\""; break;
+      case '\n': out += "\\n";  break;
+      case '\r': out += "\\r";  break;
+      case '\t': out += "\\t";  break;
+      default:
+        if ((uint8_t)c < 0x20) {
+          char buf[8]; snprintf(buf, sizeof(buf), "\\u%04x", c);
+          out += buf;
+        } else {
+          out += c;
+        }
+    }
+  }
+  out += "\"}";
+  server.send(200, "application/json", out);
 }
 
 void RoverWebServer::handleSetMotorPWM() {

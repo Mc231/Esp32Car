@@ -1,4 +1,5 @@
 #include "RoverWebSocketServer.h"
+#include "Log/RemoteLogger.h"
 
 RoverWebSocketServer::RoverWebSocketServer(RoverController& carController, RoverApplicationConfig& config, SystemMonitor& systemMonitor)
   : carController(carController), config(config), systemMonitor(systemMonitor), wsServer(config.webSocketPort)  {}
@@ -22,15 +23,15 @@ void RoverWebSocketServer::handleWebSocketMessage(uint8_t num, WStype_t type, ui
         // Parse the incoming message as JSON
         json j = json::parse(message.c_str(), nullptr, false);
         if (j.is_discarded()) {
-            Serial.println("Received message is not valid JSON");
+            Log.println("Received message is not valid JSON");
             return;
         }
 
         // Check for the "command" key in the JSON object
         if (j.contains("command")) {
             std::string command = j["command"].get<std::string>();
-            Serial.print("Received command: ");
-            Serial.println(command.c_str());
+            Log.print("Received command: ");
+            Log.println(command.c_str());
 
             if (command == "system")
             {
@@ -73,7 +74,7 @@ void RoverWebSocketServer::handleWebSocketMessage(uint8_t num, WStype_t type, ui
                return;
             }
         } else {
-            Serial.println("No command specified in message");
+            Log.println("No command specified in message");
         }
     }
 }

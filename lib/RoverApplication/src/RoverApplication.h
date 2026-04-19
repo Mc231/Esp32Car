@@ -14,6 +14,7 @@
 #include "Monitor/SystemMonitor.h"
 #include "PostSetupBroadcaster/MDNSBroadcaster.h"
 #include "Ota/OTAManager.h"
+#include "Log/RemoteLogger.h"
 
 void startCameraServer();
 
