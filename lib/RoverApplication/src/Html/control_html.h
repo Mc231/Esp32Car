@@ -123,11 +123,8 @@ const char control_index_html[] PROGMEM = R"rawliteral(
   #cameraStream {
     width: 100%;
     height: 100%;
-    object-fit: cover;
-    object-position: center;
     border: none;
     display: block;
-    background: #000;
   }
   .stage-empty {
     color: var(--text-dim);
@@ -422,7 +419,7 @@ const char control_index_html[] PROGMEM = R"rawliteral(
   </header>
 
   <section class="stage">
-    <img id="cameraStream" alt="Camera stream" referrerpolicy="no-referrer">
+    <iframe id="cameraStream" allow="autoplay" referrerpolicy="no-referrer"></iframe>
     <div class="overlay-stat tl" id="distStat"><b>—</b> cm</div>
     <div class="overlay-stat tr" id="speedStat">PWM <b>0</b></div>
     <div class="overlay-stat bl" id="motorStatL">L: —</div>

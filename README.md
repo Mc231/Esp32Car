@@ -275,6 +275,45 @@ Esp32Car/
 
 ---
 
+## OTA updates
+
+The rover supports two OTA paths after the **first** serial flash with the new partition layout (which has two app slots instead of one).
+
+### Web OTA (end-user friendly)
+
+1. Open `http://Rover.local:32231/ota` (or the gear icon → **Update Firmware (OTA)** button in the control panel).
+2. Pick a `firmware.bin` (e.g. `.pio/build/esp32cam/firmware.bin`).
+3. Click **Upload & Flash**. Progress bar shows the transfer; the rover reboots into the new firmware on completion.
+
+If `adminPassword` is set in your config, the upload page is gated by HTTP basic auth.
+
+### PlatformIO OTA (developer workflow)
+
+A second build environment is defined in `platformio.ini`:
+
+```sh
+pio run -e ota -t upload
+```
+
+It uploads over Wi-Fi to `Rover.local` instead of via the FTDI cable. If you set `adminPassword`, uncomment the `upload_flags = --auth=YOUR_PASSWORD` line in `platformio.ini`.
+
+### First time switching to OTA partitions
+
+Because the partition layout changes (one big app slot → two OTA slots + smaller SPIFFS), the **first flash with the new layout must go over serial** and **erases SPIFFS** (you'll re-do the captive-portal Wi-Fi setup once). After that, all future updates can go over the air without losing config.
+
+If you want a clean wipe, run:
+
+```sh
+pio run -t erase   # erases the whole flash, then upload normally
+pio run -t upload
+```
+
+### OTA partition layout
+
+See [`partitions_ota.csv`](partitions_ota.csv): two 1.9 MB app slots (`ota_0`, `ota_1`), a small `otadata` partition that tracks which slot is active, plus 192 KB SPIFFS. Current binary is ~1.8 MB, so OTA updates have ~150 KB of headroom before they outgrow the slot.
+
+---
+
 ## Future work
 
 - **Single-pin HC-SR04 driver** for AI-Thinker boards without soldering access to IO33.
@@ -282,7 +321,7 @@ Esp32Car/
 - **Auth on camera server** (port 80) — currently unauthenticated.
 - **Replace `std::any` payloads with `std::variant`** for type-safe telemetry without RTTI.
 - **Move HTML assets into SPIFFS** so they can be updated without reflashing.
-- **OTA updates**.
+- **Rollback / health check** for OTA — currently a bad update bricks until next serial flash.
 - **Unit tests** — abstract interfaces are already in place (`AbstractFS`, `AbstractWiFiSetupManager`).
 
 ---
