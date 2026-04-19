@@ -3,6 +3,11 @@
 MotorControl::MotorControl(MotorManager& leftMotor, MotorManager& rightMotor)
   : leftMotor(leftMotor), rightMotor(rightMotor) {}
 
+void MotorControl::begin() {
+  leftMotor.begin();
+  rightMotor.begin();
+}
+
 void MotorControl::action(MotorAction act, MotorSelection selection) {
   lastActionSelection = selection;  // Store the selection
   

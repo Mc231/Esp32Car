@@ -32,6 +32,7 @@ void RoverApplication::setup() {
   Serial.begin(this->config.serialBaud);
   Log.printf("\nRover firmware build %s %s\n", __DATE__, __TIME__);
   Log.println("OTA TEST BUILD v2");
+  motorControl.begin();   // attach LEDC PWM channels now that peripherals are ready
   initializeWiFi();
 }
 

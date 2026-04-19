@@ -15,6 +15,7 @@ enum MotorSelection {
 class MotorControl : public AbstractControl {  // Inherit from the AbstractControl
 public:
   MotorControl(MotorManager& leftMotor, MotorManager& rightMotor);
+  void begin();
   void action(MotorAction act, MotorSelection selection);
   void setPWM(MotorSelection selection, int pwmValue);
   std::map<std::string, std::any> getState() const override;  // Implement the getState method from AbstractControl

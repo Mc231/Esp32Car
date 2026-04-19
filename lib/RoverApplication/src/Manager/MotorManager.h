@@ -19,6 +19,7 @@ class MotorManager {
 
   public:
     MotorManager(int pinA, int pinB, int pwm);
+    void begin();
     void action(MotorAction act);
     void changeSpeed(int speed);
     MotorAction getCurrentAction();

@@ -4,11 +4,18 @@ MotorManager::MotorManager(int pinA, int pinB, int pwm) {
   this->pinA = pinA;
   this->pinB = pinB;
   this->pwm = pwm;
+  currentAction = STOP;
+  currentSpeed = 0;
+  // Hardware init deferred to begin(): pinMode + analogWrite at static-init
+  // run before Arduino/LEDC is ready and silently fail to attach the PWM channel.
+}
+
+void MotorManager::begin() {
   pinMode(pinA, OUTPUT);
   pinMode(pinB, OUTPUT);
   pinMode(pwm, OUTPUT);
-  currentAction = STOP;
-  currentSpeed = 0;
+  // Force LEDC channel attach for this pin while peripherals are ready.
+  analogWrite(pwm, 0);
   action(STOP);
 }
 
