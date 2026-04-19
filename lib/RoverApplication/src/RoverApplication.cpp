@@ -14,7 +14,11 @@ RoverApplication::RoverApplication(const RoverApplicationConfig& cfg)
     webServer(carController, config, systemMonitor),
     webSocketServer(carController, config, systemMonitor),
     cameraManager(),
-    postSetupBroadcaster(new MDNSBroadcaster(config.mdnsDiscoveryName)),
+    postSetupBroadcaster(new MDNSBroadcaster(config.mdnsDiscoveryName, {
+        {"http",       "tcp", 80},
+        {"rover-ctrl", "tcp", static_cast<uint16_t>(config.webServerPort)},
+        {"rover-ws",   "tcp", static_cast<uint16_t>(config.webSocketPort)}
+    })),
     isSetupComplete(false)
 {}
 
@@ -29,6 +33,9 @@ void RoverApplication::loop() {
     } else {
        webServer.handleClient();
        webSocketServer.loop();
+       if (this->config.ultrasonicSensorEnabled) {
+         ultraSonicManager.update();
+       }
     }
 }
 
@@ -38,7 +45,12 @@ void RoverApplication::initializeWiFi() {
 
 void RoverApplication::setupCompleted() {
   setupManager->stopServices();
-  Serial.println("Wi-Fi connected. Setup completed!");
+  Serial.print("Wi-Fi connected. IP: ");
+  Serial.print(WiFi.localIP());
+  Serial.print("  mDNS: http://");
+  Serial.print(this->config.mdnsDiscoveryName);
+  Serial.print(".local:");
+  Serial.println(this->config.webServerPort);
   postSetupBroadcaster->begin();
   isSetupComplete = true;
 

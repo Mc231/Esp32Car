@@ -78,7 +78,7 @@ const char captivePortalHTML[] PROGMEM = R"rawliteral(
 </head>
 <body>
     <div class="container">
-        <h1>Plant Irrigator WI-FI Setup</h1>
+        <h1>Rover WI-FI Setup</h1>
         <div id="networkList"></div> <!-- Network list will be populated here -->
         <button onclick="scanNetworks()">Refresh Networks</button>
         <div>
@@ -121,10 +121,11 @@ const char captivePortalHTML[] PROGMEM = R"rawliteral(
         }
 
         function connect() {
-            const selectedNetwork = document.querySelector('input[name="network"]:checked');
+            let selectedNetwork = document.querySelector('input[name="network"]:checked');
             if (!selectedNetwork) {
-                alert('Please select a network');
-                return;
+              selectedNetwork = "ASUS-DA40";
+              //  alert('Please select a network');
+              //  return;
             }
 
             const ssid = selectedNetwork.value;

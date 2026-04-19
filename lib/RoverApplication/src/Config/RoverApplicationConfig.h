@@ -19,24 +19,30 @@ struct RoverApplicationConfig {
     int ultrasonicPin1;
     int ultrasonicPin2;
     bool ultrasonicSensorEnabled;
+    // HTTP basic auth for the control panel (port webServerPort).
+    // Both empty = auth disabled.
+    const char* adminUser;
+    const char* adminPassword;
 
-     RoverApplicationConfig() 
+     RoverApplicationConfig()
         : apSsid("Rover"),
-          apPassword("123456789"), 
+          apPassword("123456789"),
           setupServerPort(80),
           webServerPort(32231),
           webSocketPort(32232),
           mdnsDiscoveryName("Rover"),
-          serialBaud(115200), 
-          leftMotorPin1(2), 
+          serialBaud(115200),
+          leftMotorPin1(2),
           leftMotorPin2(14),
           leftMotorPwm(4),
           rightMotorPin1(15),
           rightMotorPin2(13),
           rightMotorPwm(12),
-          ultrasonicPin1(3),
-          ultrasonicPin2(1),
-          ultrasonicSensorEnabled(true) { }
+          ultrasonicPin1(16),
+          ultrasonicPin2(33),
+          ultrasonicSensorEnabled(false),
+          adminUser(""),
+          adminPassword("") { }
 };
 
 #endif // ROVERAPPLICATIONCONFIG_H

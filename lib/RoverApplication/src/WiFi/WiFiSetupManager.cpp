@@ -69,11 +69,19 @@ void WiFiSetupManager::stopServices() {
 }
 
 void WiFiSetupManager::handleScanNetworks() {
+    WiFi.scanDelete();
+    WiFi.disconnect(false, true);
+    delay(100);
+
+    int n = WiFi.scanNetworks(false, true);
+    Serial.printf("scanNetworks found %d\n", n);
+
     String json = "[";
-    int n = WiFi.scanNetworks();
     for (int i = 0; i < n; ++i) {
         if (i) json += ",";
-        json += "{\"SSID\":\"" + WiFi.SSID(i) + "\",\"RSSI\":" + WiFi.RSSI(i) + "}";
+        String ssid = WiFi.SSID(i);
+        ssid.replace("\"", "\\\"");
+        json += "{\"SSID\":\"" + ssid + "\",\"RSSI\":" + WiFi.RSSI(i) + "}";
     }
     json += "]";
     webServer.send(200, "application/json", json);

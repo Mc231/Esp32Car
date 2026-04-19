@@ -135,8 +135,12 @@ void RoverWebSocketServer::handleCamera(const json& j) {
     if (j.contains("frame_size")) {
         int size = j["frame_size"].get<int>();
         sensor_t *s = esp_camera_sensor_get();
-        s->set_framesize(s, (framesize_t)size);
-        wsServer.broadcastTXT("{\"status\": \"Camera frame size updated\"}");
+        if (s) {
+            s->set_framesize(s, (framesize_t)size);
+            wsServer.broadcastTXT("{\"status\": \"Camera frame size updated\"}");
+        } else {
+            wsServer.broadcastTXT("{\"status\": \"Camera not initialized\"}");
+        }
     } else {
         std::map<std::string, std::any> result;
         result["status"] = "Frame size parameter missing";
@@ -180,32 +184,14 @@ void RoverWebSocketServer::sendData(const std::map<std::string, std::any>& dataM
 
 json RoverWebSocketServer::asJSON(const std::map<std::string, std::any>& map) const {
     json j;
-    for (const auto& item : map) {
-        const auto& key = item.first;
-        const auto& value = item.second;
-
-        try {
-            j[key] = std::any_cast<String>(value).c_str();
-        } catch (const std::bad_any_cast&) {
-            try {
-                j[key] = std::any_cast<std::string>(value);
-            } catch (const std::bad_any_cast&) {
-                try {
-                    j[key] = std::any_cast<int>(value);
-                } catch (const std::bad_any_cast&) {
-                    try {
-                        j[key] = std::any_cast<float>(value);
-                    } catch (const std::bad_any_cast&) {
-                        try {
-                            // This handles a nested std::map<std::string, std::any>
-                            j[key] = asJSON(std::any_cast<std::map<std::string, std::any>>(value));
-                        } catch (const std::bad_any_cast&) {
-                            // Handle other types or ignore.
-                        }
-                    }
-                }
-            }
-        }
+    for (const auto& [key, value] : map) {
+        if (auto p = std::any_cast<int>(&value))           j[key] = *p;
+        else if (auto p = std::any_cast<float>(&value))    j[key] = *p;
+        else if (auto p = std::any_cast<bool>(&value))     j[key] = *p;
+        else if (auto p = std::any_cast<std::string>(&value)) j[key] = *p;
+        else if (auto p = std::any_cast<String>(&value))   j[key] = p->c_str();
+        else if (auto p = std::any_cast<std::map<std::string, std::any>>(&value)) j[key] = asJSON(*p);
+        // unknown type → silently skipped
     }
     return j;
 }

@@ -3,6 +3,8 @@
 
 #include <Arduino.h>
 #include <WebServer.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 #include "Control/MotorControl.h"
 #include "Manager/UltrasonicManager.h"
 #include "WiFi/WiFiConfigManager.h"
@@ -21,6 +23,14 @@ private:
   WiFiConfigManager& wiFiConfigManager;
   MotorControl& motorControl;
   UltrasonicManager& ultrasonicManager;
+  SemaphoreHandle_t stateMutex;
+
+  // RAII helper for the mutex.
+  struct Lock {
+    SemaphoreHandle_t& m;
+    Lock(SemaphoreHandle_t& m) : m(m) { xSemaphoreTake(m, portMAX_DELAY); }
+    ~Lock() { xSemaphoreGive(m); }
+  };
 };
 
 #endif // ROVERCONTROLLER

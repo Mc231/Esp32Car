@@ -35,6 +35,8 @@ private:
   WebServer server;
   json asJSON(const std::map<std::string, std::any>& map) const;
   void sendData(const std::map<std::string, std::any>& dataMap, const String& responseType = "application/json");
+  // Returns true if the request is allowed to proceed. Sends 401 if not.
+  bool authorized();
 };
 
 #endif // ROVERWEBSERVER_H

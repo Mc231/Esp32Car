@@ -2,8 +2,20 @@
 #include "Html/control_html.h"
 
 RoverWebServer::RoverWebServer(RoverController& carController, RoverApplicationConfig config, SystemMonitor&)
-  : carController(carController), config(config), systemMonitor(systemMonitor), server(config.webServerPort) 
+  : carController(carController), config(config), systemMonitor(systemMonitor), server(config.webServerPort)
 {}
+
+bool RoverWebServer::authorized() {
+  // Auth disabled when both fields empty.
+  if (!config.adminUser || !config.adminPassword || config.adminUser[0] == '\0') {
+    return true;
+  }
+  if (server.authenticate(config.adminUser, config.adminPassword)) {
+    return true;
+  }
+  server.requestAuthentication();
+  return false;
+}
  
 void RoverWebServer::begin() {
   server.on("/", HTTP_GET, [this]() { handleRoot(); }); 
@@ -22,90 +34,109 @@ void RoverWebServer::begin() {
 }
 
 void RoverWebServer::handleSetMotorPWM() {
-    if (server.hasArg("plain") == false) {
-        server.send(404, "text/plain", "Body not found");
+    if (!authorized()) return;
+    if (!server.hasArg("plain")) {
+        server.send(400, "text/plain", "Body not found");
         return;
     }
-    auto j = json::parse(server.arg("plain").c_str());
-    Serial.println(j.dump().c_str());
-    if (j.contains("pwm") && j.contains("motor")) {
-        int motor = j["motor"].get<int>();
-        MotorSelection selection = static_cast<MotorSelection>(motor);
-    
+    try {
+        auto j = json::parse(server.arg("plain").c_str());
+        if (!j.contains("pwm") || !j.contains("motor")) {
+            server.send(400, "text/plain", "Missing 'pwm' or 'motor'");
+            return;
+        }
+        MotorSelection selection = static_cast<MotorSelection>(j["motor"].get<int>());
         int pwmValue = std::stoi(j["pwm"].get<std::string>());
         carController.setMotorSpeed(selection, pwmValue);
+        server.send(204);
+    } catch (const std::exception& e) {
+        server.send(400, "text/plain", String("Invalid JSON: ") + e.what());
     }
-    server.send(204);
 }
 
 void RoverWebServer::handleReboot() {
+    if (!authorized()) return;
     server.send(200, "text/plain", "Rebooting");
     carController.reboot();
 }
 
 void RoverWebServer::handleGetWiFi() {
+    if (!authorized()) return;
     auto wifiConfigMap = carController.getWiFiConfig();
     sendData(wifiConfigMap);
 }
 
 void RoverWebServer::handleWiFiForget() {
+    if (!authorized()) return;
     carController.forgotWiFi();
     server.send(200, "text/plain", "Wi-Fi config forgotten. Restarting...");
     carController.reboot();
 }
 
 void RoverWebServer::handleMotorState() {
+  if (!authorized()) return;
   sendData(carController.getMotorState());
 }
 
 void RoverWebServer::handleRoot() {
+  if (!authorized()) return;
   server.send(200, "text/html", (const char*)control_index_html);
 }
 
 void RoverWebServer::handleSetMotor() {
-    if (server.hasArg("plain") == false) {
-        server.send(404, "text/plain", "Body not found");
+    if (!authorized()) return;
+    if (!server.hasArg("plain")) {
+        server.send(400, "text/plain", "Body not found");
         return;
     }
-
-    auto j = json::parse(server.arg("plain").c_str());
-    Serial.println(j.dump().c_str());
-    if (j.contains("action") && j.contains("motor")) {
+    try {
+        auto j = json::parse(server.arg("plain").c_str());
+        if (!j.contains("action") || !j.contains("motor")) {
+            server.send(400, "text/plain", "Missing 'action' or 'motor'");
+            return;
+        }
         MotorAction action = static_cast<MotorAction>(j["action"].get<int>());
         MotorSelection selection = static_cast<MotorSelection>(j["motor"].get<int>());
         carController.setMotorAction(action, selection);
+        server.send(204);
+    } catch (const std::exception& e) {
+        server.send(400, "text/plain", String("Invalid JSON: ") + e.what());
     }
-
-    server.send(204);
 }
 
 void RoverWebServer::handleGetUltrasonic() {
+  if (!authorized()) return;
   sendData(carController.getUltrasonicState());
 }
 
 void RoverWebServer::handleCamera() {
+    if (!authorized()) return;
     if (!server.hasArg("plain")) {
-        server.send(404, "text/plain", "Body not found");
+        server.send(400, "text/plain", "Body not found");
         return;
     }
-
-    auto j = json::parse(server.arg("plain").c_str());
-
-    if (j.contains("frame_size")) {
-        int size = j["frame_size"].get<int>();
-        sensor_t *s = esp_camera_sensor_get();
-        if (s->pixformat == PIXFORMAT_JPEG) {
-            s->set_framesize(s, (framesize_t)size);
+    try {
+        auto j = json::parse(server.arg("plain").c_str());
+        if (j.contains("frame_size")) {
+            int size = j["frame_size"].get<int>();
+            sensor_t *s = esp_camera_sensor_get();
+            if (s && s->pixformat == PIXFORMAT_JPEG) {
+                s->set_framesize(s, (framesize_t)size);
+            }
         }
+        server.send(204);
+    } catch (const std::exception& e) {
+        server.send(400, "text/plain", String("Invalid JSON: ") + e.what());
     }
-    server.send(204);
 }
 
 void RoverWebServer::handleSystem() {
+  if (!authorized()) return;
   sendData(systemMonitor.getState());
 }
 
 void RoverWebServer::handleStatus() {
+    if (!authorized()) return;
     std::map<std::string, std::any> result;
     result["motor"] = carController.getMotorState();
     result["ultrasonic"] = carController.getUltrasonicState();
@@ -114,6 +145,7 @@ void RoverWebServer::handleStatus() {
 }
 
 void RoverWebServer::handleConfig() {
+    if (!authorized()) return;
     std::map<std::string, std::any> result;
     result["leftMotorPin1"] = config.leftMotorPin1;
     result["leftMotorPin2"] = config.leftMotorPin2;
@@ -132,32 +164,14 @@ void RoverWebServer::handleClient() {
 
 json RoverWebServer::asJSON(const std::map<std::string, std::any>& map) const {
     json j;
-    for (const auto& item : map) {
-        const auto& key = item.first;
-        const auto& value = item.second;
-
-        try {
-            j[key] = std::any_cast<String>(value).c_str();
-        } catch (const std::bad_any_cast&) {
-            try {
-                j[key] = std::any_cast<std::string>(value);
-            } catch (const std::bad_any_cast&) {
-                try {
-                    j[key] = std::any_cast<int>(value);
-                } catch (const std::bad_any_cast&) {
-                    try {
-                        j[key] = std::any_cast<float>(value);
-                    } catch (const std::bad_any_cast&) {
-                        try {
-                            // This handles a nested std::map<std::string, std::any>
-                            j[key] = asJSON(std::any_cast<std::map<std::string, std::any>>(value));
-                        } catch (const std::bad_any_cast&) {
-                            // Handle other types or ignore.
-                        }
-                    }
-                }
-            }
-        }
+    for (const auto& [key, value] : map) {
+        if (auto p = std::any_cast<int>(&value))           j[key] = *p;
+        else if (auto p = std::any_cast<float>(&value))    j[key] = *p;
+        else if (auto p = std::any_cast<bool>(&value))     j[key] = *p;
+        else if (auto p = std::any_cast<std::string>(&value)) j[key] = *p;
+        else if (auto p = std::any_cast<String>(&value))   j[key] = p->c_str();
+        else if (auto p = std::any_cast<std::map<std::string, std::any>>(&value)) j[key] = asJSON(*p);
+        // unknown type → silently skipped, same as before
     }
     return j;
 }
