@@ -3,7 +3,7 @@
 
 RoverApplication roverApp;
 
-void setup() {;
+void setup() {
   roverApp.setup();
 }
 

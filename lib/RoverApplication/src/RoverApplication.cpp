@@ -9,8 +9,9 @@ RoverApplication::RoverApplication(const RoverApplicationConfig& cfg)
     config(cfg),
     wiFiConfigManager(*abstractFs),
     setupManager(new WiFiSetupManager(wiFiConfigManager, config.apSsid, config.apPassword)),
-    leftMotor(config.leftMotorPin1, config.leftMotorPin2, config.leftMotorPwm),  
-    rightMotor(config.rightMotorPin1, config.rightMotorPin2, config.rightMotorPwm), 
+    // LEDC channels 4 and 5 — chosen to avoid esp_camera's XCLK on channel 0.
+    leftMotor(config.leftMotorPin1, config.leftMotorPin2, config.leftMotorPwm, 4),
+    rightMotor(config.rightMotorPin1, config.rightMotorPin2, config.rightMotorPwm, 5),
     motorControl(leftMotor, rightMotor), 
     ultraSonicManager(config.ultrasonicPin1, config.ultrasonicPin2),
     carController(wiFiConfigManager ,motorControl, ultraSonicManager),
@@ -31,8 +32,10 @@ RoverApplication::RoverApplication(const RoverApplicationConfig& cfg)
 void RoverApplication::setup() {
   Serial.begin(this->config.serialBaud);
   Log.printf("\nRover firmware build %s %s\n", __DATE__, __TIME__);
-  Log.println("OTA TEST BUILD v2");
-  motorControl.begin();   // attach LEDC PWM channels now that peripherals are ready
+  // Camera before motors — both use LEDC, camera owns channel 0 for XCLK,
+  // motors get explicit channels 4/5 in MotorManager so there's no clash.
+  cameraManager.initialize();
+  motorControl.begin();
   initializeWiFi();
 }
 
@@ -57,6 +60,10 @@ void RoverApplication::initializeWiFi() {
 
 void RoverApplication::setupCompleted() {
   setupManager->stopServices();
+  // Wi-Fi modem sleep starves the camera I2S DMA — fb_get returns NULL
+  // ("Camera capture failed") during MJPEG streaming. Trade: a bit more
+  // current, but required for stable streaming.
+  WiFi.setSleep(false);
   Log.begin();
   Log.printf("Wi-Fi connected. IP: %s  mDNS: http://%s.local:%d\n",
              WiFi.localIP().toString().c_str(),
@@ -65,8 +72,6 @@ void RoverApplication::setupCompleted() {
   Log.printf("Telnet log: nc %s 23\n", WiFi.localIP().toString().c_str());
   postSetupBroadcaster->begin();
   isSetupComplete = true;
-
-  cameraManager.initialize();
 
   webServer.begin();
   webSocketServer.begin();
