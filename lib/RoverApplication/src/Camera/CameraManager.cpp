@@ -42,14 +42,9 @@ void CameraManager::setupCamera()  {
   config.pin_sccb_scl = SIOC_GPIO_NUM;
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
-  // WROVER-DEV streams reliably at QQVGA in our testing; AI-Thinker keeps
-  // its known-good QVGA. Bump on either board after init via set_framesize
-  // if you want a bigger picture (subject to PSRAM and Wi-Fi headroom).
-#ifdef ROVER_BOARD_WROVER_CAM
-  static constexpr framesize_t kStreamFrameSize = FRAMESIZE_QQVGA;
-#else
-  static constexpr framesize_t kStreamFrameSize = FRAMESIZE_QVGA;
-#endif
+  // Streaming framesize. VGA = 640x480 — good quality, fits comfortably in
+  // PSRAM. Drop to QVGA (320x240) if Wi-Fi struggles or capture starts failing.
+  static constexpr framesize_t kStreamFrameSize = FRAMESIZE_VGA;
 
   config.xclk_freq_hz = 20000000;
   config.frame_size = kStreamFrameSize;
@@ -74,6 +69,15 @@ void CameraManager::setupCamera()  {
     s->set_brightness(s, 1);
     s->set_saturation(s, -2);
   }
+
+#ifdef ROVER_BOARD_WROVER_CAM
+  // OV2640 on the WROVER-DEV daughter board is mounted upside-down relative
+  // to the rover chassis. Flip vertically (and horizontally — otherwise the
+  // image would be mirrored after the vflip).
+  s->set_vflip(s, 1);
+  s->set_hmirror(s, 1);
+#endif
+
   // Re-apply framesize to ensure sensor is actively streaming. Same size as
   // init so frame buffers stay valid.
   s->set_framesize(s, kStreamFrameSize);
