@@ -30,7 +30,7 @@ private:
   void handleReboot();
   void handleGetWiFi();
   void handleWiFiForget();
-  void handleGetUltrasonic();
+  void handleGetDistance();
   void handleCamera(const nlohmann::json& j);
   void handleSetMotorPWM(const nlohmann::json& j);
   void handleMotorState();

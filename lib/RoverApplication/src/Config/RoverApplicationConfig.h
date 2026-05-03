@@ -18,8 +18,8 @@ struct RoverApplicationConfig {
     int rightMotorPwm;
     // Single GPIO drives HC-SR04 in single-pin mode (TRIG+ECHO joined externally
     // through a 1k resistor, line tapped via 1k/2k divider down to 3.3V).
-    int ultrasonicPin;
-    bool ultrasonicSensorEnabled;
+    int distanceSensorPin;
+    bool distanceSensorEnabled;
     // HTTP basic auth for the control panel (port webServerPort).
     // Both empty = auth disabled.
     const char* adminUser;
@@ -48,16 +48,15 @@ struct RoverApplicationConfig {
           rightMotorPin2(13),
           rightMotorPwm(12),
 #ifdef ROVER_BOARD_WROVER_CAM
-          // PSRAM eats IO16/17 on WROVER-E. IO33 is the only free non-strapping
-          // pin on the side header — single-pin HC-SR04 lives there.
-          // Disabled by default: the standard 5V HC-SR04 with push-pull ECHO
-          // doesn't work in single-pin mode (ECHO output fights the trigger
-          // pulse). Re-enable once an HC-SR04P (3.3V variant) is wired in.
-          ultrasonicPin(33),
-          ultrasonicSensorEnabled(false),
+          // PSRAM eats IO16/17 on WROVER-E. IO33 is ADC1_CH5 — analog-capable
+          // and ADC1 plays nicely with Wi-Fi. Sharp GP2Y0A21 IR distance
+          // sensor's analog output lands here directly (no resistors needed,
+          // 3.1V max output fits within the ESP32 ADC range).
+          distanceSensorPin(33),
+          distanceSensorEnabled(true),
 #else
-          ultrasonicPin(16),
-          ultrasonicSensorEnabled(false),
+          distanceSensorPin(16),
+          distanceSensorEnabled(false),
 #endif
           adminUser(""),
           adminPassword(""),

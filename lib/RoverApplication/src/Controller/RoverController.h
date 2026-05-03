@@ -6,19 +6,19 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include "Control/MotorControl.h"
-#include "Manager/UltrasonicManager.h"
+#include "Manager/DistanceManager.h"
 #include "WiFi/WiFiConfigManager.h"
 
 class RoverController {
 public:
-  RoverController(WiFiConfigManager& wiFiConfigManager, MotorControl& motorControl, UltrasonicManager& ultrasonicManager);
+  RoverController(WiFiConfigManager& wiFiConfigManager, MotorControl& motorControl, DistanceManager& distanceManager);
   void forgotWiFi();
   void reboot();
   void setMotorSpeed(MotorSelection motorSelection, int speed);
   void setMotorAction(MotorAction action, MotorSelection motorSelection);
   std::map<std::string, std::any> getWiFiConfig();
   std::map<std::string, std::any> getMotorState();
-  std::map<std::string, std::any> getUltrasonicState();
+  std::map<std::string, std::any> getDistanceState();
 
   // Deadman: call from the main loop. If no driving command has arrived
   // within deadmanTimeoutMs the motors are stopped. 0 = disabled.
@@ -27,7 +27,7 @@ public:
 private:
   WiFiConfigManager& wiFiConfigManager;
   MotorControl& motorControl;
-  UltrasonicManager& ultrasonicManager;
+  DistanceManager& distanceManager;
   SemaphoreHandle_t stateMutex;
   unsigned long lastCommandMs = 0;
   unsigned long deadmanTimeoutMs = 0;

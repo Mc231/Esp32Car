@@ -13,8 +13,8 @@ RoverApplication::RoverApplication(const RoverApplicationConfig& cfg)
     leftMotor(config.leftMotorPin1, config.leftMotorPin2, config.leftMotorPwm, 4),
     rightMotor(config.rightMotorPin1, config.rightMotorPin2, config.rightMotorPwm, 5),
     motorControl(leftMotor, rightMotor), 
-    ultraSonicManager(config.ultrasonicPin),
-    carController(wiFiConfigManager ,motorControl, ultraSonicManager),
+    distanceManager(config.distanceSensorPin),
+    carController(wiFiConfigManager ,motorControl, distanceManager),
     webServer(carController, config, systemMonitor),
     webSocketServer(carController, config, systemMonitor),
     cameraManager(),
@@ -48,8 +48,8 @@ void RoverApplication::loop() {
        otaManager.loop();
        Log.loop();
        carController.tickDeadman();
-       if (this->config.ultrasonicSensorEnabled) {
-         ultraSonicManager.update();
+       if (this->config.distanceSensorEnabled) {
+         distanceManager.update();
        }
     }
 }
@@ -78,8 +78,8 @@ void RoverApplication::setupCompleted() {
   startCameraServer();
   otaManager.begin();
   carController.setDeadmanTimeout(this->config.deadmanTimeoutMs);
-  if (this->config.ultrasonicSensorEnabled)
+  if (this->config.distanceSensorEnabled)
   {
-    ultraSonicManager.initialize();
+    distanceManager.initialize();
   }
 }

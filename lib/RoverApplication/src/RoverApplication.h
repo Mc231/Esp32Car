@@ -6,7 +6,7 @@
 #include "RoverWebServer/RoverWebServer.h"
 #include "RoverWebSocket/RoverWebSocketServer.h"
 #include "Control/MotorControl.h"
-#include "Manager/UltrasonicManager.h"
+#include "Manager/DistanceManager.h"
 #include "Camera/CameraManager.h"
 #include "Controller/RoverController.h"
 #include "esp_camera.h"
@@ -33,7 +33,7 @@ private:
   MotorManager leftMotor; 
   MotorManager rightMotor; 
   MotorControl motorControl;
-  UltrasonicManager ultraSonicManager;
+  DistanceManager distanceManager;
   RoverController carController;
   RoverWebServer webServer;
   RoverWebSocketServer webSocketServer;

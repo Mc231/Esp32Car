@@ -54,9 +54,9 @@ void RoverWebSocketServer::handleWebSocketMessage(uint8_t num, WStype_t type, ui
             } else if(command == "forget_wi_fi") {
                 handleWiFiForget();
                 return;
-            } else if (command == "ultrasonic") 
+            } else if (command == "distance")
             {
-                handleGetUltrasonic();
+                handleGetDistance();
                 return;
             } else if (command == "set_camera") {
                 handleCamera(j);
@@ -100,8 +100,8 @@ void RoverWebSocketServer::handleConfig() {
     result["rightMotorPin1"] = config.rightMotorPin1;
     result["rightMotorPin2"] = config.rightMotorPin2;
     result["rightMotorPwm"] = config.rightMotorPwm;
-    result["ultrasonicPin"] = config.ultrasonicPin;
-    result["ultrasonic_enabled"] = config.ultrasonicSensorEnabled;
+    result["distanceSensorPin"] = config.distanceSensorPin;
+    result["distance_sensor_enabled"] = config.distanceSensorEnabled;
     std::map<std::string, std::any> dataMap = {{"response", result}};
     sendData(dataMap);
 }
@@ -125,8 +125,8 @@ void RoverWebSocketServer::handleWiFiForget() {
     carController.reboot();
 }
 
-void RoverWebSocketServer::handleGetUltrasonic() {
-    std::map<std::string, std::any> dataMap = {{"response", carController.getUltrasonicState()}};
+void RoverWebSocketServer::handleGetDistance() {
+    std::map<std::string, std::any> dataMap = {{"response", carController.getDistanceState()}};
     sendData(dataMap);
 }
 

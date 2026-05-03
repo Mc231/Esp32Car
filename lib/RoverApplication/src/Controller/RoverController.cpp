@@ -2,10 +2,10 @@
 #include <WiFi.h>
 #include "Log/RemoteLogger.h"
 
-RoverController::RoverController(WiFiConfigManager& wiFiConfigManager, MotorControl& motorControl, UltrasonicManager& ultrasonicManager)
+RoverController::RoverController(WiFiConfigManager& wiFiConfigManager, MotorControl& motorControl, DistanceManager& distanceManager)
   : wiFiConfigManager(wiFiConfigManager),
     motorControl(motorControl),
-    ultrasonicManager(ultrasonicManager),
+    distanceManager(distanceManager),
     stateMutex(xSemaphoreCreateMutex())
 {}
 
@@ -61,7 +61,7 @@ std::map<std::string, std::any> RoverController::getMotorState() {
   return motorControl.getState();
 }
 
-std::map<std::string, std::any> RoverController::getUltrasonicState() {
+std::map<std::string, std::any> RoverController::getDistanceState() {
   Lock lk(stateMutex);
-  return ultrasonicManager.getState();
+  return distanceManager.getState();
 }

@@ -26,7 +26,7 @@ void RoverWebServer::begin() {
   server.on("/wifi/forget", HTTP_POST, [this]() { handleWiFiForget(); });
   server.on("/motor", HTTP_PUT, [this]() { handleSetMotor(); }); 
   server.on("/motor", HTTP_GET, [this]() { handleMotorState(); }); 
-  server.on("/ultrasonic", HTTP_GET, [this]() { handleGetUltrasonic(); });
+  server.on("/distance", HTTP_GET, [this]() { handleGetDistance(); });
   server.on("/motorPWM", HTTP_PUT, [this]() { handleSetMotorPWM(); });
   server.on("/camera", HTTP_PUT, [this]() { handleCamera(); });
   server.on("/system", HTTP_GET, [this]() { handleSystem(); });
@@ -281,9 +281,9 @@ void RoverWebServer::handleSetMotor() {
     }
 }
 
-void RoverWebServer::handleGetUltrasonic() {
+void RoverWebServer::handleGetDistance() {
   if (!authorized()) return;
-  sendData(carController.getUltrasonicState());
+  sendData(carController.getDistanceState());
 }
 
 void RoverWebServer::handleCamera() {
@@ -316,7 +316,7 @@ void RoverWebServer::handleStatus() {
     if (!authorized()) return;
     std::map<std::string, std::any> result;
     result["motor"] = carController.getMotorState();
-    result["ultrasonic"] = carController.getUltrasonicState();
+    result["distance"] = carController.getDistanceState();
     result["system"] = systemMonitor.getState();
     sendData(result);
 }
@@ -330,7 +330,7 @@ void RoverWebServer::handleConfig() {
     result["rightMotorPin1"] = config.rightMotorPin1;
     result["rightMotorPin2"] = config.rightMotorPin2;
     result["rightMotorPwm"] = config.rightMotorPwm;
-    result["ultrasonicPin"] = config.ultrasonicPin;
+    result["distanceSensorPin"] = config.distanceSensorPin;
     sendData(result);
 }
 

@@ -22,7 +22,7 @@ public:
   void handleSetMotorPWM();
   void handleMotorState();
   void handleClient();
-  void handleGetUltrasonic();
+  void handleGetDistance();
   void handleCamera();
   void handleRoot();
   void handleSystem();

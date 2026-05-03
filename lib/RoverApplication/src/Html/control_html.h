@@ -631,8 +631,8 @@ const char control_index_html[] PROGMEM = R"rawliteral(
         $('telHeap').textContent  = heap;
         $('infoHeap').textContent = heap;
       }
-      if (d.ultrasonic && d.ultrasonic.last_distance != null) {
-        const cm = parseFloat(d.ultrasonic.last_distance).toFixed(1);
+      if (d.distance && d.distance.last_distance != null) {
+        const cm = parseFloat(d.distance.last_distance).toFixed(1);
         $('telDist').textContent = cm + ' cm';
         $('distStat').innerHTML = '<b>' + cm + '</b> cm';
       } else {
@@ -670,7 +670,7 @@ const char control_index_html[] PROGMEM = R"rawliteral(
         ['Left PWM',    d.leftMotorPwm],
         ['Right motor', `${d.rightMotorPin1} / ${d.rightMotorPin2}`],
         ['Right PWM',   d.rightMotorPwm],
-        ['Ultrasonic',  d.ultrasonicPin],
+        ['Distance sensor', d.distanceSensorPin],
       ];
       rows.forEach(([k, v]) => {
         const el = document.createElement('div');
