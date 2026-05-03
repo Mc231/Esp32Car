@@ -1,5 +1,12 @@
 # Wiring HC-SR04 to ESP32-CAM (battery-powered, no soldering)
 
+> ⚠️ **Historical / deprecated.** The project moved off the HC-SR04. The
+> active distance-sensor wiring is documented in
+> [`DISTANCE_SENSOR_WIRING.md`](./DISTANCE_SENSOR_WIRING.md) (Sharp GP2Y0A21).
+> This file is kept only for reference if someone wants to revisit
+> ultrasonic on the AI-Thinker board, where the two-pin scheme below
+> still works.
+
 This guide covers wiring an HC-SR04 ultrasonic distance sensor to an AI-Thinker ESP32-CAM when:
 
 - You only have access to the **side rails** (no soldering to GPIO 33 on the back).
