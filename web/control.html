@@ -357,7 +357,7 @@
         console.warn('[ws] non-JSON message:', ev.data);
         return;
       }
-      console.log('[ws] <<', msg);
+      console.log('[ws] <<', JSON.stringify(msg));
       const resolver = state.pending.size ? state.pending.entries().next().value : null;
       if (resolver) {
         const [key, cb] = resolver;
@@ -415,11 +415,22 @@
   }
   const ACTION_LABEL = { 0: 'F', 1: 'B', 2: 'S' };
 
+  let pollInFlight = false;
   async function pollOnce() {
+    // Don't start a new poll if a previous one is still in flight — would
+    // queue overlapping requests and the FIFO response-matching would
+    // mis-attribute replies to the wrong promises.
+    if (pollInFlight) return;
+    pollInFlight = true;
     try {
-      const sysMsg = await send({ command: 'system' });
-      const distMsg = await send({ command: 'distance' });
-      const motMsg = await send({ command: 'motor_state' });
+      // Send all three concurrently. Server processes in send-order and
+      // replies in send-order; FIFO matching pairs each reply with the
+      // right Promise as long as we don't have other senders in the mix.
+      const [sysMsg, distMsg, motMsg] = await Promise.all([
+        send({ command: 'system' }),
+        send({ command: 'distance' }),
+        send({ command: 'motor_state' }),
+      ]);
 
       const sys = sysMsg?.response || {};
       const up = fmtUptime(sys.up_time);
@@ -444,6 +455,8 @@
       $('motorStatR').textContent = 'R: ' + (ACTION_LABEL[mot.rma] || '?') + ' ' + (mot.rmpwm ?? 0);
     } catch (e) {
       // Ignore — onclose will trigger reconnect path.
+    } finally {
+      pollInFlight = false;
     }
   }
   function startPolling() {
