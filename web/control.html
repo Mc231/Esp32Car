@@ -132,7 +132,18 @@
   .tel .k { display: block; font-size: 11px; color: var(--text-dim); }
   .tel .v { display: block; font-size: 13px; font-weight: 600; margin-top: 2px; }
 
-  .side-actions { display: flex; flex-direction: column; gap: 8px; }
+  .side-actions { display: flex; flex-direction: column; gap: 8px; position: relative; }
+  .icon-btn.rec.recording { color: var(--error); border-color: var(--error); }
+  .icon-btn.rec.recording svg { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+  .icon-btn.replaying { color: var(--accent); border-color: var(--accent); }
+  .rec-badge {
+    position: absolute; top: -6px; right: -6px;
+    min-width: 18px; height: 18px; padding: 0 5px;
+    border-radius: 9px; background: var(--accent); color: #fff;
+    font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,.4);
+  }
 
   .toast {
     position: fixed; left: 50%; bottom: 24px;
@@ -216,11 +227,20 @@
     </div>
 
     <div class="side-actions">
+      <button class="icon-btn rec" id="recordBtn" title="Start recording" aria-label="Record moves">
+        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>
+      </button>
+      <button class="icon-btn" id="replayBtn" title="Replay reversed" aria-label="Replay reversed" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+        </svg>
+      </button>
       <button class="icon-btn" id="rebootBtn" title="Reboot rover" aria-label="Reboot">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="23 4 23 10 17 10"/><path d="M20.49 15A9 9 0 1 1 18 5.36"/>
         </svg>
       </button>
+      <span class="rec-badge" id="recBadge" hidden>0</span>
     </div>
   </section>
 </div>
@@ -260,6 +280,26 @@
     pollTimer: null,
     reconnectTimer: null,
   };
+
+  // ---------- Move recording / reverse-replay ----------
+  // While recording.active is true, every press/release of a direction button
+  // gets stored as { action, duration }. When the user hits replay, we walk
+  // the list backwards with each direction inverted (forward<->backward,
+  // left<->right) so the rover unwinds back to (approximately) its start.
+  // Pumping keepalive sends every 700ms keeps the rover's deadman happy
+  // for moves longer than the deadman timeout.
+  const recording = {
+    active: false,
+    moves: [],
+    pressStart: 0,
+    pressAction: null,
+  };
+  const replay = {
+    active: false,
+    abort: false,
+  };
+  const REVERSE = { forward: 'backward', backward: 'forward', left: 'right', right: 'left' };
+  function reverseAction(act) { return REVERSE[act] || act; }
 
   // ---------- Toast ----------
   let toastTimer;
@@ -443,17 +483,42 @@
     stopKeepalive();
     motor(2, 2);
   };
+
+  // Hooks the recorder into a physical press/release. Manual control during
+  // a replay aborts it.
+  function onPress(act) {
+    if (replay.active) cancelReplay();
+    if (recording.active && act !== 'stop') {
+      recording.pressStart = performance.now();
+      recording.pressAction = act;
+    }
+  }
+  function onRelease(act) {
+    if (recording.active && recording.pressAction === act && recording.pressStart) {
+      const duration = Math.round(performance.now() - recording.pressStart);
+      recording.pressStart = 0;
+      recording.pressAction = null;
+      // Filter sub-100ms taps — likely mis-clicks, not intentional moves.
+      if (duration >= 100) {
+        recording.moves.push({ action: act, duration });
+        updateRecordingUI();
+      }
+    }
+  }
+
   buttons.forEach(btn => {
     const act = btn.dataset.act;
     const press = e => {
       e.preventDefault();
       btn.classList.add('active');
+      onPress(act);
       dispatch(act);
       if (act !== 'stop') startKeepalive(act);
     };
     const release = e => {
       e.preventDefault();
       btn.classList.remove('active');
+      onRelease(act);
       if (act !== 'stop') { stopKeepalive(); motor(2, 2); }
     };
     btn.addEventListener('pointerdown', press);
@@ -471,6 +536,7 @@
     pressed.add(e.key);
     e.preventDefault();
     document.querySelector('.dpad .' + ({forward:'up',backward:'down',left:'left',right:'right',stop:'stop'}[act]))?.classList.add('active');
+    onPress(act);
     dispatch(act);
     if (act !== 'stop') startKeepalive(act);
   });
@@ -479,9 +545,128 @@
     pressed.delete(e.key);
     const act = keyMap[e.key];
     document.querySelector('.dpad .' + ({forward:'up',backward:'down',left:'left',right:'right',stop:'stop'}[act]))?.classList.remove('active');
+    onRelease(act);
     if (act !== 'stop') { stopKeepalive(); motor(2, 2); }
   });
   window.addEventListener('blur', releaseAll);
+
+  // ---------- Recording / replay controls ----------
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  function updateRecordingUI() {
+    const recBtn   = $('recordBtn');
+    const replayBtn = $('replayBtn');
+    const badge    = $('recBadge');
+    recBtn.classList.toggle('recording', recording.active);
+    recBtn.title = recording.active ? 'Stop recording' : 'Start recording';
+    replayBtn.classList.toggle('replaying', replay.active);
+    replayBtn.disabled = recording.active || replay.active || recording.moves.length === 0;
+    if (recording.moves.length > 0) {
+      badge.hidden = false;
+      badge.textContent = String(recording.moves.length);
+    } else {
+      badge.hidden = true;
+    }
+  }
+
+  function startRecording() {
+    if (replay.active) return;
+    recording.active = true;
+    recording.moves = [];
+    recording.pressStart = 0;
+    recording.pressAction = null;
+    updateRecordingUI();
+    toast('Recording moves…');
+  }
+
+  function stopRecording() {
+    recording.active = false;
+    // If a button is currently held when stop is hit, finalise that move.
+    if (recording.pressAction && recording.pressStart) {
+      const duration = Math.round(performance.now() - recording.pressStart);
+      if (duration >= 100) recording.moves.push({ action: recording.pressAction, duration });
+      recording.pressStart = 0;
+      recording.pressAction = null;
+    }
+    updateRecordingUI();
+    toast('Recorded ' + recording.moves.length + ' move' + (recording.moves.length === 1 ? '' : 's'),
+          recording.moves.length > 0 ? 'success' : '');
+  }
+
+  $('recordBtn').addEventListener('click', () => {
+    if (recording.active) stopRecording();
+    else startRecording();
+  });
+
+  // Long-press the record button to clear the recording without starting
+  // a new one. Mobile-friendly alternative to a separate "trash" button.
+  let recHoldTimer = null;
+  $('recordBtn').addEventListener('pointerdown', () => {
+    clearTimeout(recHoldTimer);
+    recHoldTimer = setTimeout(() => {
+      if (recording.moves.length > 0 && confirm('Clear recorded moves?')) {
+        recording.active = false;
+        recording.moves = [];
+        updateRecordingUI();
+        toast('Recording cleared');
+      }
+    }, 700);
+  });
+  $('recordBtn').addEventListener('pointerup',    () => clearTimeout(recHoldTimer));
+  $('recordBtn').addEventListener('pointerleave', () => clearTimeout(recHoldTimer));
+
+  function cancelReplay() {
+    if (!replay.active) return;
+    replay.abort = true;
+    motor(2, 2);
+    toast('Replay cancelled');
+  }
+
+  // Drives a single move for `durationMs`, pumping keepalive sends every
+  // 700ms so the rover's deadman doesn't auto-stop us mid-move.
+  async function executeReplayMove(act, durationMs) {
+    dispatch(act);
+    let elapsed = 0;
+    const TICK = 700;
+    while (elapsed < durationMs && !replay.abort) {
+      const wait = Math.min(TICK, durationMs - elapsed);
+      await sleep(wait);
+      elapsed += wait;
+      if (elapsed < durationMs && !replay.abort) dispatch(act);
+    }
+    motor(2, 2);
+  }
+
+  async function startReplay() {
+    if (replay.active || recording.active || recording.moves.length === 0) return;
+    replay.active = true;
+    replay.abort = false;
+    updateRecordingUI();
+    toast('Replaying ' + recording.moves.length + ' moves in reverse…');
+
+    // Walk the list backwards, inverting each direction.
+    const sequence = [...recording.moves].reverse();
+    for (const move of sequence) {
+      if (replay.abort || !state.online) break;
+      await executeReplayMove(reverseAction(move.action), move.duration);
+      // Brief settle pause between moves so the rover physically stops
+      // before the next direction kicks in.
+      if (!replay.abort) await sleep(200);
+    }
+
+    motor(2, 2);
+    replay.active = false;
+    updateRecordingUI();
+    if (!replay.abort) toast('Replay finished', 'success');
+  }
+
+  $('replayBtn').addEventListener('click', () => {
+    if (replay.active) cancelReplay();
+    else startReplay();
+  });
+
+  // Initial UI sync.
+  updateRecordingUI();
 
   // ---------- Speed slider ----------
   $('speed').addEventListener('input', e => {

@@ -93,6 +93,36 @@ Available WS commands the page sends:
 | `set_motor_pwm` | set per-motor speed |
 | `reboot` | restart the WROVER |
 
+### Record & reverse-replay ("come back")
+
+The control page can record your moves and play them back **in reverse**,
+which (in theory) walks the rover back to its starting position. There's
+no real odometry — it's pure timing-based replay — so it's accurate when
+the rover doesn't slip and the floor is flat.
+
+How to use:
+
+1. **Tap the red record button** in the side controls. The button pulses
+   while recording and a small badge shows the move count.
+2. Drive the rover normally with the d-pad (or arrow keys). Each time
+   you press-and-hold a direction button, a `{action, duration}` entry
+   gets stored. Sub-100 ms taps are ignored.
+3. **Tap the record button again to stop**.
+4. **Tap the reverse-arrow (↺) button** to replay. The page walks the
+   recorded list **backwards**, **inverting each direction**:
+   - `forward` → `backward`
+   - `backward` → `forward`
+   - `left` → `right`
+   - `right` → `left`
+5. While replaying, manually pressing any d-pad button **cancels the
+   replay** so you can take over. You can also tap the replay button
+   itself to abort.
+6. **Long-press** the record button (≈700 ms) to clear the recording
+   without starting a new one.
+
+During replay the page pumps a keepalive command every 700 ms so the
+rover's 1500 ms motor-deadman doesn't stop us mid-move.
+
 ### Camera stream
 
 Displayed as a plain `<img>` pointing at `http://<host>:81/stream` (the
