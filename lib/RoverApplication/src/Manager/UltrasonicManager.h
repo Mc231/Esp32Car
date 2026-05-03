@@ -8,7 +8,9 @@
 
 class UltrasonicManager {
 public:
-  UltrasonicManager(int trigPin, int echoPin);
+  // Single-pin HC-SR04: TRIG and ECHO joined externally through a 1k resistor,
+  // ESP32 pin tapped via 1k/2k divider so the 5V echo lands at ~3.3V.
+  UltrasonicManager(int signalPin);
   void initialize();
   // Call from the main loop. Triggers a new measurement if the previous one
   // finished or timed out. Non-blocking.
@@ -17,15 +19,13 @@ public:
   std::map<std::string, std::any> getState();
 
 private:
-  int trigPin;
-  int echoPin;
+  int signalPin;
   float lastDistance;
 
   static constexpr unsigned long MEASUREMENT_INTERVAL_US = 60000;  // 60 ms between pings
   static constexpr unsigned long ECHO_TIMEOUT_US        = 30000;  // ~5 m max range
 
   // ISR-shared state — single instance assumption (one ultrasonic per board).
-  // volatile + atomic because written from ISR, read from main loop.
   static UltrasonicManager* instance;
   volatile unsigned long echoStartUs = 0;
   volatile unsigned long echoEndUs   = 0;

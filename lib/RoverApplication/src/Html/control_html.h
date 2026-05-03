@@ -670,7 +670,7 @@ const char control_index_html[] PROGMEM = R"rawliteral(
         ['Left PWM',    d.leftMotorPwm],
         ['Right motor', `${d.rightMotorPin1} / ${d.rightMotorPin2}`],
         ['Right PWM',   d.rightMotorPwm],
-        ['Ultrasonic',  `${d.ultrasonicPin1} / ${d.ultrasonicPin2}`],
+        ['Ultrasonic',  d.ultrasonicPin],
       ];
       rows.forEach(([k, v]) => {
         const el = document.createElement('div');

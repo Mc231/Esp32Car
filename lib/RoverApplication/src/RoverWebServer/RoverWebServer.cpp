@@ -330,8 +330,7 @@ void RoverWebServer::handleConfig() {
     result["rightMotorPin1"] = config.rightMotorPin1;
     result["rightMotorPin2"] = config.rightMotorPin2;
     result["rightMotorPwm"] = config.rightMotorPwm;
-    result["ultrasonicPin1"] = config.ultrasonicPin1;
-    result["ultrasonicPin2"] = config.ultrasonicPin2;
+    result["ultrasonicPin"] = config.ultrasonicPin;
     sendData(result);
 }
 

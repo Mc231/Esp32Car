@@ -100,8 +100,7 @@ void RoverWebSocketServer::handleConfig() {
     result["rightMotorPin1"] = config.rightMotorPin1;
     result["rightMotorPin2"] = config.rightMotorPin2;
     result["rightMotorPwm"] = config.rightMotorPwm;
-    result["ultrasonicPin1"] = config.ultrasonicPin1;
-    result["ultrasonicPin2"] = config.ultrasonicPin2;
+    result["ultrasonicPin"] = config.ultrasonicPin;
     result["ultrasonic_enabled"] = config.ultrasonicSensorEnabled;
     std::map<std::string, std::any> dataMap = {{"response", result}};
     sendData(dataMap);

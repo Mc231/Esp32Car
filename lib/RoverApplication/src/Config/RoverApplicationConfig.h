@@ -16,8 +16,9 @@ struct RoverApplicationConfig {
     int rightMotorPin1;
     int rightMotorPin2;
     int rightMotorPwm;
-    int ultrasonicPin1;
-    int ultrasonicPin2;
+    // Single GPIO drives HC-SR04 in single-pin mode (TRIG+ECHO joined externally
+    // through a 1k resistor, line tapped via 1k/2k divider down to 3.3V).
+    int ultrasonicPin;
     bool ultrasonicSensorEnabled;
     // HTTP basic auth for the control panel (port webServerPort).
     // Both empty = auth disabled.
@@ -47,14 +48,17 @@ struct RoverApplicationConfig {
           rightMotorPin2(13),
           rightMotorPwm(12),
 #ifdef ROVER_BOARD_WROVER_CAM
-          // IO16/17 are consumed by PSRAM on real WROVER-E. Disable until
-          // single-pin HC-SR04 refactor lands and a free pin is chosen.
-          ultrasonicPin1(-1),
-#else
-          ultrasonicPin1(16),
-#endif
-          ultrasonicPin2(33),
+          // PSRAM eats IO16/17 on WROVER-E. IO33 is the only free non-strapping
+          // pin on the side header — single-pin HC-SR04 lives there.
+          // Disabled by default: the standard 5V HC-SR04 with push-pull ECHO
+          // doesn't work in single-pin mode (ECHO output fights the trigger
+          // pulse). Re-enable once an HC-SR04P (3.3V variant) is wired in.
+          ultrasonicPin(33),
           ultrasonicSensorEnabled(false),
+#else
+          ultrasonicPin(16),
+          ultrasonicSensorEnabled(false),
+#endif
           adminUser(""),
           adminPassword(""),
           deadmanTimeoutMs(1500) { }

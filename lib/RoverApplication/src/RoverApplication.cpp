@@ -13,7 +13,7 @@ RoverApplication::RoverApplication(const RoverApplicationConfig& cfg)
     leftMotor(config.leftMotorPin1, config.leftMotorPin2, config.leftMotorPwm, 4),
     rightMotor(config.rightMotorPin1, config.rightMotorPin2, config.rightMotorPwm, 5),
     motorControl(leftMotor, rightMotor), 
-    ultraSonicManager(config.ultrasonicPin1, config.ultrasonicPin2),
+    ultraSonicManager(config.ultrasonicPin),
     carController(wiFiConfigManager ,motorControl, ultraSonicManager),
     webServer(carController, config, systemMonitor),
     webSocketServer(carController, config, systemMonitor),
