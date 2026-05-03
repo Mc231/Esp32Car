@@ -324,34 +324,53 @@
   // ordering relies on the server replying in receive order (it does today).
   function connect() {
     const url = 'ws://' + host + ':32232/';
+    console.log('[ws] connecting to', url);
     const ws = new WebSocket(url);
     state.ws = ws;
     ws.onopen = () => {
+      console.log('[ws] open');
       setOnline(true);
+      // The rover boots with motor PWM = 0, so set_motor commands flip the
+      // H-bridge but the motors don't physically spin. Push the slider's
+      // current value as soon as we connect so the very first move actually
+      // moves.
+      applySpeed(state.speed, 2);
       // Kick off telemetry polling once connected.
       startPolling();
       loadStaticInfo();
     };
-    ws.onclose = () => {
+    ws.onclose = ev => {
+      console.warn('[ws] close — code=' + ev.code + ' reason="' + ev.reason + '" wasClean=' + ev.wasClean);
       setOnline(false);
       stopPolling();
       state.ws = null;
+      // Reject any in-flight requests so callers see an error rather than hang.
+      state.pending.forEach(cb => { try { cb({ error: 'disconnected' }); } catch {} });
+      state.pending.clear();
       // Auto-reconnect with simple backoff.
       clearTimeout(state.reconnectTimer);
       state.reconnectTimer = setTimeout(connect, 2000);
     };
-    ws.onerror = () => { /* close handler will fire too */ };
+    ws.onerror = e => { console.error('[ws] error', e); };
     ws.onmessage = ev => {
       let msg;
-      try { msg = JSON.parse(ev.data); } catch { return; }
+      try { msg = JSON.parse(ev.data); } catch (e) {
+        console.warn('[ws] non-JSON message:', ev.data);
+        return;
+      }
       const resolver = state.pending.size ? state.pending.entries().next().value : null;
       if (resolver) {
         const [key, cb] = resolver;
         state.pending.delete(key);
         cb(msg);
+      } else {
+        console.log('[ws] msg with no pending resolver:', msg);
       }
     };
   }
+
+  // Log every outgoing command so we can correlate with disconnects.
+  const _send_orig = null;
 
   function send(payload, expectsReply = true) {
     return new Promise((resolve, reject) => {
@@ -373,8 +392,10 @@
         resolve(null);
       }
       try {
-        state.ws.send(JSON.stringify(payload));
-      } catch (e) { reject(e); }
+        const text = JSON.stringify(payload);
+        console.log('[ws] >>', text);
+        state.ws.send(text);
+      } catch (e) { console.error('[ws] send threw', e); reject(e); }
     });
   }
 
@@ -450,9 +471,11 @@
     return send({ command: 'set_motor', action, motor: m }).catch(() => {});
   }
   function applySpeed(v, m) {
+    // PWM must be sent as a number — the rover's WS handler parses it with
+    // `j["pwm"].get<int>()` which throws on string values.
     const motors = m === 2 ? [0, 1] : [m];
     motors.forEach(mm => {
-      send({ command: 'set_motor_pwm', motor: mm, pwm: String(v) }).catch(() => {});
+      send({ command: 'set_motor_pwm', motor: mm, pwm: parseInt(v, 10) }).catch(() => {});
     });
   }
 
@@ -506,10 +529,16 @@
     }
   }
 
+  // Track which buttons are actually held down so spurious pointerleave
+  // events (hover without click) don't fire releases that send phantom stops.
+  const heldButtons = new Set();
   buttons.forEach(btn => {
     const act = btn.dataset.act;
     const press = e => {
       e.preventDefault();
+      if (heldButtons.has(act)) return;  // already pressed; ignore double-fire
+      heldButtons.add(act);
+      console.log('[btn] press', act);
       btn.classList.add('active');
       onPress(act);
       dispatch(act);
@@ -517,6 +546,9 @@
     };
     const release = e => {
       e.preventDefault();
+      if (!heldButtons.has(act)) return;  // never pressed → ignore
+      heldButtons.delete(act);
+      console.log('[btn] release', act);
       btn.classList.remove('active');
       onRelease(act);
       if (act !== 'stop') { stopKeepalive(); motor(2, 2); }
