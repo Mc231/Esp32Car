@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<title>Rovers</title>
+<style>
+  :root {
+    --bg: #0b1020; --bg-elev: #131a30; --bg-card: #1a2240;
+    --border: #2a345a; --text: #e7ebf5; --text-dim: #8a93b3;
+    --accent: #5b8cff; --accent-2: #8a5bff;
+    --success: #3ddc84; --warning: #ffb454; --error: #ff6b6b;
+    --shadow: 0 10px 30px rgba(0,0,0,.45);
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f3f5fb; --bg-elev:#fff; --bg-card:#fff; --border:#e2e6f0; --text:#161a2b; --text-dim:#5e6680; --shadow:0 8px 24px rgba(20,30,60,.10); }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
+    color: var(--text);
+    background: radial-gradient(1200px 600px at 50% -10%, rgba(91,140,255,.15), transparent), var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 24px 16px 40px; }
+  header.bar { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+  .logo {
+    width: 40px; height: 40px; border-radius: 11px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: inline-flex; align-items: center; justify-content: center;
+    box-shadow: var(--shadow);
+  }
+  .logo svg { width: 22px; height: 22px; color: #fff; }
+  h1 { font-size: 22px; font-weight: 650; margin: 0; letter-spacing: -.01em; }
+  .subtitle { color: var(--text-dim); font-size: 13px; margin-top: 2px; }
+
+  .card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+  }
+
+  .rover-list { display: flex; flex-direction: column; gap: 8px; }
+  .rover {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    align-items: center; gap: 12px;
+    padding: 12px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    cursor: pointer;
+    transition: transform .12s, border-color .12s;
+  }
+  .rover:hover { border-color: var(--accent); }
+  .rover:active { transform: scale(.99); }
+  .rover .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--text-dim);
+  }
+  .rover .dot.ok   { background: var(--success); box-shadow: 0 0 8px var(--success); }
+  .rover .dot.err  { background: var(--error); }
+  .rover .dot.warn { background: var(--warning); }
+  .rover .info { min-width: 0; }
+  .rover .name { font-weight: 600; font-size: 15px; }
+  .rover .host { font-size: 12px; color: var(--text-dim); margin-top: 2px;
+                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rover .status { font-size: 12px; color: var(--text-dim); margin-right: 4px; }
+  .rover .status.ok  { color: var(--success); }
+  .rover .status.err { color: var(--error); }
+  .rover .actions { display: flex; gap: 4px; }
+  .rover .icon-btn {
+    background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+    border-radius: 8px; width: 30px; height: 30px;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .rover .icon-btn:hover { color: var(--text); border-color: var(--accent); }
+  .rover .icon-btn.danger:hover { color: var(--error); border-color: var(--error); }
+  .rover .icon-btn svg { width: 14px; height: 14px; }
+
+  .empty {
+    text-align: center; padding: 28px 16px; color: var(--text-dim); font-size: 14px;
+  }
+
+  form.add-form {
+    display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px;
+  }
+  form.add-form input {
+    background: var(--bg-card); border: 1px solid var(--border); color: var(--text);
+    border-radius: 10px; padding: 10px 12px; font-size: 14px; outline: none;
+  }
+  form.add-form input:focus { border-color: var(--accent); }
+  button.primary {
+    background: var(--accent); color: #fff; border: none;
+    padding: 10px 16px; border-radius: 10px; font-size: 14px; font-weight: 600;
+    cursor: pointer; min-width: 88px;
+  }
+  button.primary:active { transform: scale(.98); }
+  button.primary:disabled { opacity: .5; cursor: not-allowed; }
+
+  .section-label { color: var(--text-dim); font-size: 11px; font-weight: 600;
+                   text-transform: uppercase; letter-spacing: .08em; margin: 0 0 10px 2px; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 24px;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--bg-card); border: 1px solid var(--border); color: var(--text);
+    padding: 10px 14px; border-radius: 10px; box-shadow: var(--shadow);
+    font-size: 13px; opacity: 0; transition: opacity .2s, transform .2s;
+    z-index: 60; pointer-events: none; max-width: 90vw;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.error { border-color: var(--error); color: var(--error); }
+  .toast.success { border-color: var(--success); color: var(--success); }
+
+  @media (max-width: 540px) {
+    form.add-form { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="bar">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="8" width="18" height="10" rx="2"/>
+        <circle cx="7.5" cy="18" r="1.6"/>
+        <circle cx="16.5" cy="18" r="1.6"/>
+        <path d="M7 8V5h10v3"/>
+      </svg>
+    </div>
+    <div>
+      <h1>Rovers</h1>
+      <div class="subtitle">Pick a rover to control</div>
+    </div>
+  </header>
+
+  <div class="card">
+    <div class="section-label">Saved rovers</div>
+    <div class="rover-list" id="roverList"></div>
+    <div class="empty" id="emptyMsg" hidden>No rovers yet. Add one below.</div>
+  </div>
+
+  <div class="card">
+    <div class="section-label">Add a rover</div>
+    <form class="add-form" id="addForm" autocomplete="off">
+      <input id="addName" type="text" placeholder="Name (e.g. Garage rover)" required>
+      <input id="addHost" type="text" placeholder="IP or hostname (e.g. 192.168.1.42 or Rover.local)" required>
+      <button class="primary" type="submit">Add</button>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+
+  const STORE_KEY = 'rovers.v1';
+  const WS_PORT   = 32232;        // matches RoverWebSocketServer default
+  const PROBE_TIMEOUT_MS = 2500;  // give Wi-Fi mDNS lookups a beat
+
+  // ---------- Toast ----------
+  let toastTimer;
+  function toast(msg, kind = '') {
+    const el = $('toast');
+    el.textContent = msg;
+    el.className = 'toast show ' + kind;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.className = 'toast', 2200);
+  }
+
+  // ---------- Persistence ----------
+  function load() {
+    try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
+    catch { return []; }
+  }
+  function save(rovers) {
+    localStorage.setItem(STORE_KEY, JSON.stringify(rovers));
+  }
+
+  // ---------- Online probe via WebSocket ----------
+  // We open a WS to the rover's control port. If it opens within timeout, online.
+  // No fetch() so we sidestep CORS entirely.
+  function probe(host) {
+    return new Promise(resolve => {
+      let done = false;
+      const url = 'ws://' + host + ':' + WS_PORT + '/';
+      let ws;
+      try { ws = new WebSocket(url); }
+      catch (e) { resolve(false); return; }
+      const timer = setTimeout(() => {
+        if (done) return;
+        done = true;
+        try { ws.close(); } catch {}
+        resolve(false);
+      }, PROBE_TIMEOUT_MS);
+      ws.onopen  = () => { if (done) return; done = true; clearTimeout(timer); ws.close(); resolve(true); };
+      ws.onerror = () => { if (done) return; done = true; clearTimeout(timer); resolve(false); };
+      ws.onclose = () => { if (done) return; done = true; clearTimeout(timer); resolve(false); };
+    });
+  }
+
+  // ---------- Render ----------
+  function renderRovers() {
+    const rovers = load();
+    const list = $('roverList');
+    const empty = $('emptyMsg');
+    list.innerHTML = '';
+    if (rovers.length === 0) {
+      empty.hidden = false;
+      return;
+    }
+    empty.hidden = true;
+
+    rovers.forEach((r, idx) => {
+      const row = document.createElement('div');
+      row.className = 'rover';
+      row.innerHTML = `
+        <div class="dot warn" data-dot></div>
+        <div class="info">
+          <div class="name"></div>
+          <div class="host"></div>
+        </div>
+        <div class="status warn" data-status>checking…</div>
+        <div class="actions">
+          <button class="icon-btn" data-edit title="Rename">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z"/>
+            </svg>
+          </button>
+          <button class="icon-btn danger" data-del title="Remove">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              <path d="M10 11v6M14 11v6"/>
+              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            </svg>
+          </button>
+        </div>
+      `;
+      row.querySelector('.name').textContent = r.name;
+      row.querySelector('.host').textContent = r.host;
+
+      // Open the control panel for this rover. Stop event propagation if the
+      // click was inside one of the action buttons.
+      row.addEventListener('click', e => {
+        if (e.target.closest('button')) return;
+        location.href = 'control.html?host=' + encodeURIComponent(r.host) + '&name=' + encodeURIComponent(r.name);
+      });
+
+      row.querySelector('[data-edit]').addEventListener('click', e => {
+        e.stopPropagation();
+        const newName = prompt('Rename rover:', r.name);
+        if (newName && newName.trim()) {
+          const list = load();
+          list[idx] = { ...list[idx], name: newName.trim() };
+          save(list);
+          renderRovers();
+        }
+      });
+
+      row.querySelector('[data-del]').addEventListener('click', e => {
+        e.stopPropagation();
+        if (!confirm('Remove "' + r.name + '"?')) return;
+        const list = load();
+        list.splice(idx, 1);
+        save(list);
+        renderRovers();
+        toast('Removed');
+      });
+
+      list.appendChild(row);
+
+      // Async probe — update dot when result arrives.
+      probe(r.host).then(online => {
+        const dot = row.querySelector('[data-dot]');
+        const status = row.querySelector('[data-status]');
+        dot.className = 'dot ' + (online ? 'ok' : 'err');
+        status.className = 'status ' + (online ? 'ok' : 'err');
+        status.textContent = online ? 'online' : 'offline';
+      });
+    });
+  }
+
+  // ---------- Add form ----------
+  $('addForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const name = $('addName').value.trim();
+    const host = $('addHost').value.trim();
+    if (!name || !host) return;
+    const list = load();
+    if (list.find(r => r.host === host)) {
+      toast('A rover with that host already exists', 'error');
+      return;
+    }
+    list.push({ name, host });
+    save(list);
+    $('addName').value = '';
+    $('addHost').value = '';
+    renderRovers();
+    toast('Added "' + name + '"', 'success');
+  });
+
+  // ---------- First load ----------
+  renderRovers();
+
+  // Refresh probes every 15 seconds so status pills don't go stale.
+  setInterval(renderRovers, 15000);
+})();
+</script>
+</body>
+</html>
