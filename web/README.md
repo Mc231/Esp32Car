@@ -24,13 +24,26 @@ control the rover, not a replacement.
 
 ```
 web/
-├── index.html      # Rover picker (list, add, remove, online status)
-├── control.html    # Camera + d-pad + telemetry for one selected rover
-└── README.md       # this file
+├── index.html              # Rover picker (HTML shell)
+├── control.html            # Control panel (HTML shell)
+├── README.md
+├── css/
+│   ├── theme.css           # design tokens (colours, spacing, type)
+│   ├── components.css      # buttons, pills, toast, cards, logo
+│   ├── picker.css          # picker page layout
+│   └── control.css         # control page layout (header + camera + d-pad)
+└── js/
+    ├── store.js            # localStorage-backed rover list
+    ├── toast.js            # tiny toast helper
+    ├── ws.js               # WebSocket transport (queue, reconnect, probe)
+    ├── recording.js        # record + reverse-replay engine
+    ├── controls-input.js   # d-pad / keyboard event bindings
+    ├── picker.js           # picker page entry
+    └── control.js          # control page entry — wires everything together
 ```
 
-No build step, no dependencies, no node_modules. Single-page apps using
-plain HTML + vanilla JS. Open the source to see what they do.
+No build step, no dependencies, no node_modules. ES modules served as plain
+files via any local HTTP server. Open the source to see what they do.
 
 ---
 

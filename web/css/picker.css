@@ -1,0 +1,99 @@
+/* Picker page (index.html) */
+
+.wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 20px 60px;
+}
+
+header.bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+header.bar h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.015em;
+}
+header.bar .subtitle {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin-top: 3px;
+}
+
+.rover-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rover {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast),
+              background var(--transition-fast), box-shadow var(--transition-fast);
+}
+.rover:hover {
+  border-color: var(--accent);
+  background: var(--bg-3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), 0 0 0 1px var(--accent-glow);
+}
+.rover:active { transform: scale(0.99); }
+
+.rover .dot { width: 11px; height: 11px; }
+
+.rover .info { min-width: 0; }
+.rover .name { font-weight: 600; font-size: 15px; letter-spacing: -0.005em; }
+.rover .host {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.rover .status {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-right: 4px;
+}
+.rover .status.ok  { color: var(--success); }
+.rover .status.err { color: var(--error); }
+
+.rover .actions { display: flex; gap: 6px; }
+.rover .actions .icon-btn { width: 32px; height: 32px; }
+.rover .actions .icon-btn svg { width: 14px; height: 14px; }
+
+.empty {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+.empty svg { width: 36px; height: 36px; margin-bottom: 8px; color: var(--text-muted); }
+
+form.add-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+}
+
+@media (max-width: 540px) {
+  form.add-form { grid-template-columns: 1fr; }
+  .wrap { padding: 24px 16px 40px; }
+}

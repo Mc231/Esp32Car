@@ -1,0 +1,78 @@
+/* Design tokens — single source of truth for colours, spacing, type. */
+:root {
+  /* Surfaces */
+  --bg-0: #0a0e1f;
+  --bg-1: #111733;
+  --bg-2: #1a2342;
+  --bg-3: #232f55;
+  --border: #2a345a;
+  --border-strong: #3a4673;
+
+  /* Text */
+  --text: #eef0f8;
+  --text-dim: #8a93b3;
+  --text-muted: #5a6285;
+
+  /* Accents */
+  --accent: #6c8eff;
+  --accent-2: #b06cff;
+  --accent-glow: rgba(108, 142, 255, 0.35);
+  --success: #3ddc84;
+  --success-glow: rgba(61, 220, 132, 0.35);
+  --warning: #ffb454;
+  --error: #ff6b80;
+  --error-glow: rgba(255, 107, 128, 0.35);
+
+  /* Effects */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.45);
+  --shadow-glow: 0 0 32px var(--accent-glow);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* Animations */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-fast: 120ms var(--ease-out);
+  --transition-med: 220ms var(--ease-out);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg-0: #f4f6fc;
+    --bg-1: #ffffff;
+    --bg-2: #ffffff;
+    --bg-3: #f0f3fb;
+    --border: #e2e6f0;
+    --border-strong: #c8cfe0;
+    --text: #161a2b;
+    --text-dim: #5e6680;
+    --text-muted: #8c93ad;
+    --shadow-sm: 0 2px 6px rgba(20, 30, 60, 0.06);
+    --shadow-md: 0 8px 24px rgba(20, 30, 60, 0.10);
+    --shadow-lg: 0 16px 48px rgba(20, 30, 60, 0.14);
+  }
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  background:
+    radial-gradient(800px 500px at 15% -10%, rgba(108, 142, 255, 0.18), transparent 50%),
+    radial-gradient(900px 600px at 85% 110%, rgba(176, 108, 255, 0.14), transparent 55%),
+    var(--bg-0);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+::selection { background: var(--accent-glow); color: var(--text); }
