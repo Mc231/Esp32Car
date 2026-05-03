@@ -30,8 +30,8 @@ void RoverWebSocketServer::handleWebSocketMessage(uint8_t num, WStype_t type, ui
         // Check for the "command" key in the JSON object
         if (j.contains("command")) {
             std::string command = j["command"].get<std::string>();
-            Log.print("Received command: ");
-            Log.println(command.c_str());
+            // (Per-command log removed — was noisy under polling at ~3-5 lines/s.
+            // Re-enable temporarily if you need to debug a specific command.)
 
             if (command == "system")
             {
