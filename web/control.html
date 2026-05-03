@@ -328,13 +328,12 @@
     const ws = new WebSocket(url);
     state.ws = ws;
     ws.onopen = () => {
-      console.log('[ws] open');
+      console.log('[ws] open  (build 2026-05-03b)');
       setOnline(true);
-      // The rover boots with motor PWM = 0, so set_motor commands flip the
-      // H-bridge but the motors don't physically spin. Push the slider's
-      // current value as soon as we connect so the very first move actually
-      // moves.
-      applySpeed(state.speed, 2);
+      // (Intentionally NOT auto-sending PWM here. The rover boots with motor
+      // PWM = 0, so the very first move command after a fresh boot won't
+      // physically spin the motors. The user has to nudge the speed slider
+      // once. We'll send it on the slider's first interaction.)
       // Kick off telemetry polling once connected.
       startPolling();
       loadStaticInfo();
@@ -358,6 +357,7 @@
         console.warn('[ws] non-JSON message:', ev.data);
         return;
       }
+      console.log('[ws] <<', msg);
       const resolver = state.pending.size ? state.pending.entries().next().value : null;
       if (resolver) {
         const [key, cb] = resolver;
@@ -471,11 +471,14 @@
     return send({ command: 'set_motor', action, motor: m }).catch(() => {});
   }
   function applySpeed(v, m) {
-    // PWM must be sent as a number — the rover's WS handler parses it with
-    // `j["pwm"].get<int>()` which throws on string values.
+    // PWM must be sent as a number, not a string — the rover's WS handler
+    // parses it with `j["pwm"].get<int>()` which traps on a JSON string
+    // value (no exceptions on ESP32 → abort → reset). Sanitise hard so a
+    // bad slider value can't possibly send NaN / a string / out-of-range.
+    const pwm = Math.max(0, Math.min(255, parseInt(v, 10) || 0));
     const motors = m === 2 ? [0, 1] : [m];
     motors.forEach(mm => {
-      send({ command: 'set_motor_pwm', motor: mm, pwm: parseInt(v, 10) }).catch(() => {});
+      send({ command: 'set_motor_pwm', motor: mm, pwm: pwm }).catch(() => {});
     });
   }
 
