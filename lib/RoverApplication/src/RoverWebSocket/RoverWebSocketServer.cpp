@@ -5,21 +5,37 @@ RoverWebSocketServer::RoverWebSocketServer(CommandDispatcher& dispatcher, const 
   : wsServer(config.webSocketPort), dispatcher(dispatcher) {}
 
 void RoverWebSocketServer::begin() {
+  if (running) return;
   wsServer.begin();
   wsServer.onEvent([this](uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
     this->handleWebSocketMessage(num, type, payload, length);
   });
+  running = true;
+  Log.println("[ws] started");
+}
+
+void RoverWebSocketServer::stop() {
+  if (!running) return;
+  // Drop all clients. The listener stays bound to the port — Links2004's
+  // WebSocketsServer doesn't expose a clean teardown — but `running`
+  // gates message handling so new arrivals get nothing back. Reasonable
+  // for a runtime toggle; full shutdown would require a heap-allocated
+  // server we new/delete here.
+  wsServer.disconnect();
+  running = false;
+  Log.println("[ws] stopped");
 }
 
 void RoverWebSocketServer::loop() {
-  wsServer.loop();
+  if (running) wsServer.loop();
 }
 
 void RoverWebSocketServer::broadcast(const std::string& payload) {
-  wsServer.broadcastTXT(payload.c_str(), payload.size());
+  if (running) wsServer.broadcastTXT(payload.c_str(), payload.size());
 }
 
 void RoverWebSocketServer::handleWebSocketMessage(uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
+  if (!running) return;
   if (type != WStype_TEXT) return;
   payload[length] = 0;   // null-terminate
   std::string raw(reinterpret_cast<char*>(payload), length);

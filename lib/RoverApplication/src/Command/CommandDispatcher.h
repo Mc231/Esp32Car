@@ -9,7 +9,9 @@
 #include <nlohmann/json.hpp>
 #include "Controller/RoverController.h"
 #include "Config/RoverApplicationConfig.h"
+#include "Config/RuntimeConfigManager.h"
 #include "Monitor/SystemMonitor.h"
+#include "TransportRegistry.h"
 
 // Transport-agnostic JSON command dispatcher.
 //
@@ -36,10 +38,18 @@ public:
   // through the command parsing path. Used by MQTT's periodic publisher.
   std::string buildTelemetry();
 
+  // Optional wiring for the runtime transport-toggle commands. When both
+  // are set, `transports` and `set_transport` work; otherwise the
+  // dispatcher returns an "unavailable" status for them.
+  void setTransportRegistry(TransportRegistry* r) { registry = r; }
+  void setRuntimeConfig(RuntimeConfigManager* rc) { runtimeConfigMgr = rc; }
+
 private:
   RoverController& controller;
   RoverApplicationConfig config;
   SystemMonitor& systemMonitor;
+  TransportRegistry* registry = nullptr;
+  RuntimeConfigManager* runtimeConfigMgr = nullptr;
 
   void handleSystem(const ReplyFn& respond);
   void handleStatus(const ReplyFn& respond);
@@ -52,6 +62,8 @@ private:
   void handleSetMotorPWM(const nlohmann::json& j, const ReplyFn& respond);
   void handleMotorState(const ReplyFn& respond);
   void handleSetMotor(const nlohmann::json& j, const ReplyFn& respond);
+  void handleListTransports(const ReplyFn& respond);
+  void handleSetTransport(const nlohmann::json& j, const ReplyFn& respond);
 
   // Build a JSON-serialized response from a std::map<std::string, std::any>.
   std::string serialize(const std::map<std::string, std::any>& dataMap) const;

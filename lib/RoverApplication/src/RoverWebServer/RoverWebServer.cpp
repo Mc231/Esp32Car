@@ -19,6 +19,7 @@ bool RoverWebServer::authorized() {
 }
 
 void RoverWebServer::begin() {
+  if (running) return;
   // Unified JSON command surface — same shape as WS / BLE / MQTT.
   // Body: a JSON object with a "command" field. Reply: the dispatcher's
   // first respond() call (every command currently emits exactly one).
@@ -33,10 +34,19 @@ void RoverWebServer::begin() {
   server.on("/logs", HTTP_GET, [this]() { handleLogsPage(); });
   server.on("/logs/data", HTTP_GET, [this]() { handleLogsData(); });
   server.begin(config.webServerPort);
+  running = true;
+  Log.println("[http] started");
+}
+
+void RoverWebServer::stop() {
+  if (!running) return;
+  server.close();
+  running = false;
+  Log.println("[http] stopped");
 }
 
 void RoverWebServer::handleClient() {
-  server.handleClient();
+  if (running) server.handleClient();
 }
 
 void RoverWebServer::handleApiCommand() {

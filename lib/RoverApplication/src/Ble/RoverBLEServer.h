@@ -6,6 +6,7 @@
 #include <Arduino.h>
 #include <string>
 #include "Command/CommandDispatcher.h"
+#include "Command/ICommandTransport.h"
 
 // Forward declarations to keep NimBLE headers out of this header — they
 // pull in a lot and slow down every TU that includes us.
@@ -22,18 +23,23 @@ class NimBLECharacteristic;
 //   Service: 7c2d50c0-19a8-4a10-9c4b-ab5f7e3a2710
 //   CMD    : 7c2d50c1-19a8-4a10-9c4b-ab5f7e3a2710
 //   STATE  : 7c2d50c2-19a8-4a10-9c4b-ab5f7e3a2710
-class RoverBLEServer {
+class RoverBLEServer : public ICommandTransport {
 public:
   RoverBLEServer(CommandDispatcher& dispatcher,
                  const std::string& deviceName,
                  const std::string& staticPasskey6);
-  void begin();
+
+  // ICommandTransport
+  const char* name() const override { return "ble"; }
+  void begin() override;
+  void stop() override;
+  bool isRunning() const override { return running; }
+  // loop() not needed — NimBLE runs its own FreeRTOS task.
+
   // Called by the CMD characteristic write callback.
   void handleIncoming(const std::string& payload);
   // Notify the current reply on STATE.
   void notifyReply(const std::string& payload);
-
-  bool isInitialized() const { return initialized; }
 
 private:
   CommandDispatcher& dispatcher;
@@ -42,7 +48,8 @@ private:
   NimBLEServer*         server   = nullptr;
   NimBLECharacteristic* cmdChar  = nullptr;
   NimBLECharacteristic* stateChar = nullptr;
-  bool initialized = false;
+  bool initialized = false;   // NimBLE has been initialized once
+  bool running = false;       // currently advertising and accepting
 };
 
 #endif // ROVER_FEATURE_BLE

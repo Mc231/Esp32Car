@@ -5,22 +5,31 @@
 #include <WebServer.h>
 #include "Config/RoverApplicationConfig.h"
 #include "Command/CommandDispatcher.h"
+#include "Command/ICommandTransport.h"
 
 // HTTP transport — exposes the unified JSON command surface plus the
 // firmware utility pages (OTA upload, log viewer). The legacy per-route
 // REST handlers (/motor, /system, …) and the firmware-served control
 // HTML page were removed; the standalone `web/` app is the UI now and
 // new clients should POST `/api/cmd`.
-class RoverWebServer {
+class RoverWebServer : public ICommandTransport {
 public:
   RoverWebServer(const RoverApplicationConfig& config, CommandDispatcher& dispatcher);
-  void begin();
+
+  // ICommandTransport
+  const char* name() const override { return "http"; }
+  void begin() override;
+  void stop() override;
+  void loop() override { handleClient(); }
+  bool isRunning() const override { return running; }
+
   void handleClient();
 
 private:
   RoverApplicationConfig config;
   CommandDispatcher& dispatcher;
   WebServer server;
+  bool running = false;
 
   void handleApiCommand();      // POST /api/cmd  — JSON in, JSON out
   void handleOtaPage();         // GET  /ota

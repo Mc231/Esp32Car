@@ -35,6 +35,7 @@ void RoverMqttClient::buildTopics() {
 }
 
 void RoverMqttClient::begin() {
+  if (enabled) return;
   if (cfg.host.empty()) {
     Log.println("[mqtt] no broker host configured — disabled");
     return;
@@ -48,10 +49,23 @@ void RoverMqttClient::begin() {
   mqtt.setBufferSize(1024);
   mqtt.setKeepAlive(30);
   mqtt.setSocketTimeout(5);
-  Log.printf("[mqtt] configured: %s:%u prefix=%s id=%s\n",
+  enabled = true;
+  Log.printf("[mqtt] started: %s:%u prefix=%s id=%s\n",
              cfg.host.c_str(), cfg.port,
              cfg.topicPrefix.empty() ? "rover" : cfg.topicPrefix.c_str(),
              clientId.c_str());
+}
+
+void RoverMqttClient::stop() {
+  if (!enabled) return;
+  if (mqtt.connected()) {
+    // Best-effort: publish "offline" to status before tearing down so
+    // subscribers see us go away cleanly (LWT also covers ungraceful drops).
+    mqtt.publish(topicStatus.c_str(), "offline", true);
+    mqtt.disconnect();
+  }
+  enabled = false;
+  Log.println("[mqtt] stopped");
 }
 
 bool RoverMqttClient::connect() {
@@ -80,6 +94,7 @@ bool RoverMqttClient::connect() {
 }
 
 void RoverMqttClient::loop() {
+  if (!enabled) return;
   if (cfg.host.empty()) return;
   if (WiFi.status() != WL_CONNECTED) return;
   if (!mqtt.connected()) {

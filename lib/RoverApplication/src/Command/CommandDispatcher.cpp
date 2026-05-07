@@ -34,6 +34,68 @@ void CommandDispatcher::dispatchRaw(const std::string& raw, const ReplyFn& respo
   else if (command == "motor_state") handleMotorState(respond);
   else if (command == "set_motor")   handleSetMotor(j, respond);
   else if (command == "set_motor_pwm") handleSetMotorPWM(j, respond);
+  else if (command == "transports")    handleListTransports(respond);
+  else if (command == "set_transport") handleSetTransport(j, respond);
+}
+
+void CommandDispatcher::handleListTransports(const ReplyFn& respond) {
+  if (!registry) {
+    respond("{\"status\":\"transport registry unavailable\"}");
+    return;
+  }
+  // Build the response by hand — transports list is a JSON array of
+  // {name, running} objects which doesn't fit cleanly into the std::any
+  // map shape.
+  std::string out = "{\"response\":[";
+  for (size_t i = 0; i < registry->size(); ++i) {
+    auto* t = registry->at(i);
+    if (i) out += ",";
+    out += "{\"name\":\"";
+    out += t->name();
+    out += "\",\"running\":";
+    out += t->isRunning() ? "true" : "false";
+    out += "}";
+  }
+  out += "]}";
+  respond(out);
+}
+
+void CommandDispatcher::handleSetTransport(const json& j, const ReplyFn& respond) {
+  if (!registry) {
+    respond("{\"status\":\"transport registry unavailable\"}");
+    return;
+  }
+  if (!j.contains("name") || !j.contains("enabled")) {
+    respond("{\"status\":\"name or enabled missing\"}");
+    return;
+  }
+  std::string n = j["name"].get<std::string>();
+  bool enabled  = j["enabled"].get<bool>();
+  auto* t = registry->find(n.c_str());
+  if (!t) {
+    respond("{\"status\":\"unknown transport\"}");
+    return;
+  }
+  if (enabled) t->begin(); else t->stop();
+
+  // Persist toggle state for MQTT/BLE so it survives reboot. HTTP/WS
+  // are always-on at boot regardless of last toggle, since they are
+  // the bootstrap channels.
+  if (runtimeConfigMgr) {
+    auto cfg = runtimeConfigMgr->read();
+    bool dirty = false;
+    if (n == "mqtt") { cfg.mqttEnabled = enabled; dirty = true; }
+    else if (n == "ble") { cfg.bleEnabled = enabled; dirty = true; }
+    if (dirty) runtimeConfigMgr->save(cfg);
+  }
+
+  // Reply with the new state.
+  std::string out = "{\"response\":{\"name\":\"";
+  out += n;
+  out += "\",\"running\":";
+  out += t->isRunning() ? "true" : "false";
+  out += "}}";
+  respond(out);
 }
 
 std::string CommandDispatcher::buildTelemetry() {

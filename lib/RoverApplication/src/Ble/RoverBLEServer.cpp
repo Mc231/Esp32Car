@@ -61,44 +61,66 @@ RoverBLEServer::RoverBLEServer(CommandDispatcher& dispatcher,
 }
 
 void RoverBLEServer::begin() {
-  Log.printf("[ble] initializing as '%s' (pin %06u)\n", deviceName.c_str(), passkey);
-  NimBLEDevice::init(deviceName);
-  NimBLEDevice::setPower(ESP_PWR_LVL_P9);
+  if (running) return;
 
-  // Static passkey, MITM, no bonding (no NVS state to leak between owners).
-  NimBLEDevice::setSecurityAuth(/*bonding=*/false, /*MITM=*/true, /*SC=*/false);
-  NimBLEDevice::setSecurityIOCap(BLE_HS_IO_DISPLAY_ONLY);
-  NimBLEDevice::setSecurityPasskey(passkey);
+  // First start: full GATT init. Re-starts after stop(): just re-advertise.
+  if (!initialized) {
+    Log.printf("[ble] initializing as '%s' (pin %06u)\n", deviceName.c_str(), passkey);
+    NimBLEDevice::init(deviceName);
+    NimBLEDevice::setPower(ESP_PWR_LVL_P9);
 
-  server = NimBLEDevice::createServer();
-  server->setCallbacks(new ServerCallbacks());
+    // Static passkey, MITM, no bonding (no NVS state to leak between owners).
+    NimBLEDevice::setSecurityAuth(/*bonding=*/false, /*MITM=*/true, /*SC=*/false);
+    NimBLEDevice::setSecurityIOCap(BLE_HS_IO_DISPLAY_ONLY);
+    NimBLEDevice::setSecurityPasskey(passkey);
 
-  NimBLEService* svc = server->createService(kServiceUUID);
+    server = NimBLEDevice::createServer();
+    server->setCallbacks(new ServerCallbacks());
 
-  cmdChar = svc->createCharacteristic(
-    kCmdUUID,
-    NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR | NIMBLE_PROPERTY::WRITE_ENC | NIMBLE_PROPERTY::WRITE_AUTHEN
-  );
-  cmdChar->setCallbacks(new CmdCallbacks(*this));
+    NimBLEService* svc = server->createService(kServiceUUID);
 
-  stateChar = svc->createCharacteristic(
-    kStateUUID,
-    NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::READ_ENC | NIMBLE_PROPERTY::READ_AUTHEN
-  );
-  stateChar->setValue(std::string("{\"status\":\"ready\"}"));
+    cmdChar = svc->createCharacteristic(
+      kCmdUUID,
+      NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR | NIMBLE_PROPERTY::WRITE_ENC | NIMBLE_PROPERTY::WRITE_AUTHEN
+    );
+    cmdChar->setCallbacks(new CmdCallbacks(*this));
 
-  svc->start();
+    stateChar = svc->createCharacteristic(
+      kStateUUID,
+      NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::READ_ENC | NIMBLE_PROPERTY::READ_AUTHEN
+    );
+    stateChar->setValue(std::string("{\"status\":\"ready\"}"));
 
-  NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
-  adv->addServiceUUID(kServiceUUID);
-  adv->setScanResponse(true);
-  adv->setName(deviceName);
+    svc->start();
+
+    NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
+    adv->addServiceUUID(kServiceUUID);
+    adv->setScanResponse(true);
+    adv->setName(deviceName);
+    initialized = true;
+  }
+
   NimBLEDevice::startAdvertising();
-  initialized = true;
+  running = true;
   Log.println("[ble] advertising started");
 }
 
+void RoverBLEServer::stop() {
+  if (!running) return;
+  // Stop advertising and disconnect any active centrals. Keeps the GATT
+  // structure live so begin() can resume cheaply (NimBLEDevice::deinit
+  // is heavyweight and a re-init can fail without a reboot).
+  NimBLEDevice::stopAdvertising();
+  if (server) {
+    auto peers = server->getPeerDevices();
+    for (auto handle : peers) server->disconnect(handle);
+  }
+  running = false;
+  Log.println("[ble] advertising stopped");
+}
+
 void RoverBLEServer::handleIncoming(const std::string& payload) {
+  if (!running) return;
   // Reply via STATE notify. Multiple respond() calls within one dispatch
   // will produce multiple notifications, in order — matches WS broadcast
   // semantics where each respond() is its own frame.
@@ -108,7 +130,7 @@ void RoverBLEServer::handleIncoming(const std::string& payload) {
 }
 
 void RoverBLEServer::notifyReply(const std::string& payload) {
-  if (!stateChar) return;
+  if (!stateChar || !running) return;
   stateChar->setValue(payload);
   stateChar->notify();
 }

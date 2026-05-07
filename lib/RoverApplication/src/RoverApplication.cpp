@@ -17,6 +17,7 @@ RoverApplication::RoverApplication(const RoverApplicationConfig& cfg)
     distanceManager(config.distanceSensorPin),
     carController(wiFiConfigManager, motorControl, distanceManager),
     commandDispatcher(carController, config, systemMonitor),
+    transports(),
     webServer(config, commandDispatcher),
     webSocketServer(commandDispatcher, config),
 #ifndef ROVER_NO_CAMERA
@@ -49,18 +50,13 @@ void RoverApplication::loop() {
      if (!isSetupComplete) {
         setupManager->handleClient();
     } else {
-       webServer.handleClient();
-       webSocketServer.loop();
+       transports.loopAll();
        otaManager.loop();
        Log.loop();
        carController.tickDeadman();
        if (this->config.distanceSensorEnabled) {
          distanceManager.update();
        }
-#ifdef ROVER_FEATURE_MQTT
-       if (mqttClient) mqttClient->loop();
-#endif
-       // BLE: NimBLE runs its own task — nothing to pump here.
     }
 }
 
@@ -83,8 +79,6 @@ void RoverApplication::setupCompleted() {
   postSetupBroadcaster->begin();
   isSetupComplete = true;
 
-  webServer.begin();
-  webSocketServer.begin();
 #ifndef ROVER_NO_CAMERA
   startCameraServer();
 #endif
@@ -95,38 +89,55 @@ void RoverApplication::setupCompleted() {
     distanceManager.initialize();
   }
 
-  startOptionalServices();
+  registerTransports();
 }
 
-void RoverApplication::startOptionalServices() {
+void RoverApplication::registerTransports() {
+  // Always-on transports first — they're the bootstrap channels (you
+  // need them to flip the others via `set_transport`).
+  transports.add(&webServer);
+  transports.add(&webSocketServer);
+
   const auto& rc = runtimeConfig.read();
 
 #ifdef ROVER_FEATURE_BLE
-  if (rc.bleEnabled) {
-    std::string name = rc.bleDeviceName.length() > 0
-                         ? std::string(rc.bleDeviceName.c_str())
-                         : std::string(config.mdnsDiscoveryName);
-    std::string pin = rc.blePin.length() > 0 ? std::string(rc.blePin.c_str()) : std::string("123456");
-    bleServer = new RoverBLEServer(commandDispatcher, name, pin);
-    bleServer->begin();
-  } else {
-    Log.println("[ble] disabled in runtime config");
-  }
+  std::string bleName = rc.bleDeviceName.length() > 0
+                          ? std::string(rc.bleDeviceName.c_str())
+                          : std::string(config.mdnsDiscoveryName);
+  std::string blePin = rc.blePin.length() > 0
+                         ? std::string(rc.blePin.c_str())
+                         : std::string("123456");
+  bleServer = new RoverBLEServer(commandDispatcher, bleName, blePin);
+  transports.add(bleServer);
 #endif
 
 #ifdef ROVER_FEATURE_MQTT
-  if (rc.mqttEnabled && rc.mqttHost.length() > 0) {
-    RoverMqttClient::Config mc;
-    mc.host        = std::string(rc.mqttHost.c_str());
-    mc.port        = static_cast<uint16_t>(rc.mqttPort);
-    mc.user        = std::string(rc.mqttUser.c_str());
-    mc.password    = std::string(rc.mqttPassword.c_str());
-    mc.clientId    = std::string(rc.mqttClientId.c_str());
-    mc.topicPrefix = std::string(rc.mqttTopicPrefix.c_str());
-    mqttClient = new RoverMqttClient(commandDispatcher, mc);
-    mqttClient->begin();
-  } else {
-    Log.println("[mqtt] disabled in runtime config");
-  }
+  RoverMqttClient::Config mc;
+  mc.host        = std::string(rc.mqttHost.c_str());
+  mc.port        = static_cast<uint16_t>(rc.mqttPort);
+  mc.user        = std::string(rc.mqttUser.c_str());
+  mc.password    = std::string(rc.mqttPassword.c_str());
+  mc.clientId    = std::string(rc.mqttClientId.c_str());
+  mc.topicPrefix = std::string(rc.mqttTopicPrefix.c_str());
+  mqttClient = new RoverMqttClient(commandDispatcher, mc);
+  transports.add(mqttClient);
+#endif
+
+  // Wire the registry + runtime config into the dispatcher so the
+  // `transports` and `set_transport` commands can find/toggle/persist.
+  commandDispatcher.setTransportRegistry(&transports);
+  commandDispatcher.setRuntimeConfig(&runtimeConfig);
+
+  // Start always-on transports unconditionally; optional ones only if
+  // their runtime flag is set.
+  webServer.begin();
+  webSocketServer.begin();
+#ifdef ROVER_FEATURE_BLE
+  if (rc.bleEnabled) bleServer->begin();
+  else Log.println("[ble] disabled in runtime config");
+#endif
+#ifdef ROVER_FEATURE_MQTT
+  if (rc.mqttEnabled && rc.mqttHost.length() > 0) mqttClient->begin();
+  else Log.println("[mqtt] disabled in runtime config");
 #endif
 }

@@ -142,6 +142,8 @@ All four transports accept the **same JSON envelope**. Body shape: `{"command": 
 | `set_motor_pwm`  | `motor` (0/1/2), `pwm` (0-255 int)                  | applies PWM, replies with motor state         |
 | `set_camera`     | `frame_size` (0-13)                                 | switches MJPEG resolution                     |
 | `reboot`         | —                                                   | replies, then restarts                        |
+| `transports`     | —                                                   | list of registered transports + running state |
+| `set_transport`  | `name` ("ble" / "mqtt"), `enabled` (bool)           | start/stop a transport at runtime; persists for next boot |
 
 **MQTT extras:** when MQTT is enabled, the rover also auto-publishes a combined telemetry frame to `rover/<id>/telemetry` every 2 s (no command needed) and a retained `online`/`offline` LWT on `rover/<id>/status`.
 

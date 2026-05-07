@@ -8,6 +8,7 @@
 #include <PubSubClient.h>
 #include <string>
 #include "Command/CommandDispatcher.h"
+#include "Command/ICommandTransport.h"
 
 // MQTT bridge for the rover's command surface.
 //
@@ -16,7 +17,7 @@
 //   <prefix>/<id>/response   → we publish JSON replies + ad-hoc state
 //   <prefix>/<id>/telemetry  → we publish periodic system+motor+distance
 //   <prefix>/<id>/status     → "online" (retained); LWT publishes "offline"
-class RoverMqttClient {
+class RoverMqttClient : public ICommandTransport {
 public:
   struct Config {
     std::string host;
@@ -30,10 +31,16 @@ public:
   };
 
   RoverMqttClient(CommandDispatcher& dispatcher, const Config& cfg);
-  void begin();
-  void loop();
+
+  // ICommandTransport
+  const char* name() const override { return "mqtt"; }
+  void begin() override;
+  void stop() override;
+  void loop() override;
+  bool isRunning() const override { return enabled; }
 
 private:
+  bool enabled = false;
   CommandDispatcher& dispatcher;
   Config cfg;
   WiFiClient    netClient;

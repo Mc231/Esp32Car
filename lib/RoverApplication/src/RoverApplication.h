@@ -7,6 +7,7 @@
 #include "RoverWebServer/RoverWebServer.h"
 #include "RoverWebSocket/RoverWebSocketServer.h"
 #include "Command/CommandDispatcher.h"
+#include "Command/TransportRegistry.h"
 #include "Control/MotorControl.h"
 #include "Manager/DistanceManager.h"
 #ifndef ROVER_NO_CAMERA
@@ -48,6 +49,7 @@ private:
   DistanceManager distanceManager;
   RoverController carController;
   CommandDispatcher commandDispatcher;
+  TransportRegistry transports;
   RoverWebServer webServer;
   RoverWebSocketServer webSocketServer;
 #ifndef ROVER_NO_CAMERA
@@ -67,7 +69,7 @@ private:
 
   void setupCompleted();
   void initializeWiFi();
-  void startOptionalServices();
+  void registerTransports();
 };
 
 #endif // ROVERAPPLICATION_H
