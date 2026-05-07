@@ -68,6 +68,24 @@ void RoverMqttClient::stop() {
   Log.println("[mqtt] stopped");
 }
 
+void RoverMqttClient::reconfigure(const Config& newCfg) {
+  bool wasRunning = enabled;
+  if (wasRunning) stop();
+  cfg = newCfg;
+  if (!cfg.host.empty()) {
+    // Re-derive client id + topics from the (possibly new) prefix and id.
+    // begin() also calls buildTopics(), but doing it here lets the new
+    // values be observable even before begin() is called.
+    buildTopics();
+    mqtt.setServer(cfg.host.c_str(), cfg.port);
+  }
+  Log.printf("[mqtt] reconfigured: host=%s port=%u prefix=%s id=%s\n",
+             cfg.host.c_str(), cfg.port,
+             cfg.topicPrefix.empty() ? "rover" : cfg.topicPrefix.c_str(),
+             clientId.c_str());
+  // Caller decides whether to begin() again.
+}
+
 bool RoverMqttClient::connect() {
   if (cfg.host.empty()) return false;
   Log.printf("[mqtt] connecting to %s:%u as %s\n", cfg.host.c_str(), cfg.port, clientId.c_str());

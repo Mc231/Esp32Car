@@ -39,6 +39,12 @@ public:
   void loop() override;
   bool isRunning() const override { return enabled; }
 
+  // Hot-reload broker config without rebooting the rover. Stops the
+  // current connection, swaps in the new Config, rebuilds topic strings,
+  // and leaves the client stopped. Caller calls begin() to bring it up
+  // with the new settings.
+  void reconfigure(const Config& newCfg);
+
 private:
   bool enabled = false;
   CommandDispatcher& dispatcher;

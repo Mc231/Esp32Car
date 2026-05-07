@@ -64,6 +64,7 @@ private:
   void handleSetMotor(const nlohmann::json& j, const ReplyFn& respond);
   void handleListTransports(const ReplyFn& respond);
   void handleSetTransport(const nlohmann::json& j, const ReplyFn& respond);
+  void handleSetMqttConfig(const nlohmann::json& j, const ReplyFn& respond);
 
   // Build a JSON-serialized response from a std::map<std::string, std::any>.
   std::string serialize(const std::map<std::string, std::any>& dataMap) const;

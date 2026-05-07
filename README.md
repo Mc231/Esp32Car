@@ -144,6 +144,7 @@ All four transports accept the **same JSON envelope**. Body shape: `{"command": 
 | `reboot`         | —                                                   | replies, then restarts                        |
 | `transports`     | —                                                   | list of registered transports + running state |
 | `set_transport`  | `name` ("ble" / "mqtt"), `enabled` (bool)           | start/stop a transport at runtime; persists for next boot |
+| `set_mqtt_config` | any of: `host`, `port`, `user`, `password`, `clientId`, `topicPrefix`, `enabled` | hot-reload MQTT broker without reboot. Stops, swaps config, optionally re-starts. Partial updates supported. Persists. |
 
 **MQTT extras:** when MQTT is enabled, the rover also auto-publishes a combined telemetry frame to `rover/<id>/telemetry` every 2 s (no command needed) and a retained `online`/`offline` LWT on `rover/<id>/status`.
 

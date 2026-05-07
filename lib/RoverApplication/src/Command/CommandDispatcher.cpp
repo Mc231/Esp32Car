@@ -2,6 +2,9 @@
 #ifndef ROVER_NO_CAMERA
 #include "esp_camera.h"
 #endif
+#ifdef ROVER_FEATURE_MQTT
+#include "Mqtt/RoverMqttClient.h"
+#endif
 #include "Log/RemoteLogger.h"
 
 using json = nlohmann::json;
@@ -36,6 +39,7 @@ void CommandDispatcher::dispatchRaw(const std::string& raw, const ReplyFn& respo
   else if (command == "set_motor_pwm") handleSetMotorPWM(j, respond);
   else if (command == "transports")    handleListTransports(respond);
   else if (command == "set_transport") handleSetTransport(j, respond);
+  else if (command == "set_mqtt_config") handleSetMqttConfig(j, respond);
 }
 
 void CommandDispatcher::handleListTransports(const ReplyFn& respond) {
@@ -58,6 +62,68 @@ void CommandDispatcher::handleListTransports(const ReplyFn& respond) {
   }
   out += "]}";
   respond(out);
+}
+
+void CommandDispatcher::handleSetMqttConfig(const json& j, const ReplyFn& respond) {
+#ifndef ROVER_FEATURE_MQTT
+  (void)j;
+  respond("{\"status\":\"mqtt not built into this firmware\"}");
+#else
+  if (!registry || !runtimeConfigMgr) {
+    respond("{\"status\":\"transport registry unavailable\"}");
+    return;
+  }
+  auto* t = registry->find("mqtt");
+  if (!t) {
+    respond("{\"status\":\"mqtt transport not registered\"}");
+    return;
+  }
+
+  // Merge incoming fields into the persisted runtime config. Partial
+  // updates are allowed — only fields present in `j` are touched.
+  auto cfg = runtimeConfigMgr->read();
+  if (j.contains("host"))        cfg.mqttHost        = String(j["host"].get<std::string>().c_str());
+  if (j.contains("port"))        cfg.mqttPort        = j["port"].get<int>();
+  if (j.contains("user"))        cfg.mqttUser        = String(j["user"].get<std::string>().c_str());
+  if (j.contains("password"))    cfg.mqttPassword    = String(j["password"].get<std::string>().c_str());
+  if (j.contains("clientId"))    cfg.mqttClientId    = String(j["clientId"].get<std::string>().c_str());
+  if (j.contains("topicPrefix")) cfg.mqttTopicPrefix = String(j["topicPrefix"].get<std::string>().c_str());
+  if (j.contains("enabled"))     cfg.mqttEnabled     = j["enabled"].get<bool>();
+  runtimeConfigMgr->save(cfg);
+
+  // Compose the typed Config and apply it.
+  RoverMqttClient::Config mc;
+  mc.host        = std::string(cfg.mqttHost.c_str());
+  mc.port        = static_cast<uint16_t>(cfg.mqttPort);
+  mc.user        = std::string(cfg.mqttUser.c_str());
+  mc.password    = std::string(cfg.mqttPassword.c_str());
+  mc.clientId    = std::string(cfg.mqttClientId.c_str());
+  mc.topicPrefix = std::string(cfg.mqttTopicPrefix.c_str());
+
+  // Safe static_cast — only RoverMqttClient registers under the name "mqtt".
+  // dynamic_cast would be safer but RTTI cost isn't worth it here.
+  auto* mqtt = static_cast<RoverMqttClient*>(t);
+  mqtt->reconfigure(mc);
+  if (cfg.mqttEnabled && !cfg.mqttHost.isEmpty()) mqtt->begin();
+
+  // Reply with the current state. Don't echo password back.
+  std::string out = "{\"response\":{\"name\":\"mqtt\",\"host\":\"";
+  out += cfg.mqttHost.c_str();
+  out += "\",\"port\":";
+  out += std::to_string(cfg.mqttPort);
+  out += ",\"user\":\"";
+  out += cfg.mqttUser.c_str();
+  out += "\",\"clientId\":\"";
+  out += cfg.mqttClientId.c_str();
+  out += "\",\"topicPrefix\":\"";
+  out += cfg.mqttTopicPrefix.c_str();
+  out += "\",\"enabled\":";
+  out += cfg.mqttEnabled ? "true" : "false";
+  out += ",\"running\":";
+  out += t->isRunning() ? "true" : "false";
+  out += "}}";
+  respond(out);
+#endif
 }
 
 void CommandDispatcher::handleSetTransport(const json& j, const ReplyFn& respond) {
