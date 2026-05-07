@@ -24,7 +24,6 @@ Per-env flags pick what the firmware ships with. Set in `platformio.ini` build_f
 | ---- | ------ |
 | `ROVER_FEATURE_DISTANCE` | Enables the Sharp GP2Y0A21 IR distance sensor + the `distance` command. WROVER envs set this; AI-Thinker doesn't (no free pin). |
 | `ROVER_FEATURE_MQTT`     | Pulls in `PubSubClient` and the MQTT bridge. |
-| `ROVER_NO_CAMERA`        | Drops the camera + camera HTTP server (port 81). |
 - **Optional ultrasonic distance sensor** (HC-SR04) — disabled by default because the AI-Thinker board has very few free GPIOs.
 - **Production-shaped architecture** — dependency injection via a config struct, mutex-protected shared state, interrupt-driven sensor capture, abstract filesystem interface for testability.
 

@@ -1,7 +1,5 @@
 #include "CommandDispatcher.h"
-#ifndef ROVER_NO_CAMERA
 #include "esp_camera.h"
-#endif
 #include "Log/RemoteLogger.h"
 
 using json = nlohmann::json;
@@ -159,10 +157,6 @@ void CommandDispatcher::handleGetDistance(const ReplyFn& respond) {
 }
 
 void CommandDispatcher::handleCamera(const json& j, const ReplyFn& respond) {
-#ifdef ROVER_NO_CAMERA
-  (void)j;
-  respond("{\"status\": \"Camera not present in this build\"}");
-#else
   if (!j.contains("frame_size")) {
     std::map<std::string, std::any> result = {{"status", std::string("Frame size parameter missing")}};
     respond(serialize(result));
@@ -176,7 +170,6 @@ void CommandDispatcher::handleCamera(const json& j, const ReplyFn& respond) {
   } else {
     respond("{\"status\": \"Camera not initialized\"}");
   }
-#endif
 }
 
 void CommandDispatcher::handleSetMotorPWM(const json& j, const ReplyFn& respond) {

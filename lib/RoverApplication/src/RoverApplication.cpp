@@ -19,9 +19,7 @@ RoverApplication::RoverApplication(const RoverApplicationConfig& cfg)
     transports(),
     webServer(config, commandDispatcher),
     webSocketServer(commandDispatcher, config),
-#ifndef ROVER_NO_CAMERA
     cameraManager(),
-#endif
     postSetupBroadcaster(new MDNSBroadcaster(config.mdnsDiscoveryName, {
         {"http",       "tcp", 80},
         {"rover-ctrl", "tcp", static_cast<uint16_t>(config.webServerPort)},
@@ -36,11 +34,9 @@ RoverApplication::RoverApplication(const RoverApplicationConfig& cfg)
 void RoverApplication::setup() {
   Serial.begin(this->config.serialBaud);
   Log.printf("\nRover firmware build %s %s\n", __DATE__, __TIME__);
-#ifndef ROVER_NO_CAMERA
   // Camera before motors — both use LEDC, camera owns channel 0 for XCLK,
   // motors get explicit channels 4/5 in MotorManager so there's no clash.
   cameraManager.initialize();
-#endif
   motorControl.begin();
   initializeWiFi();
 }
@@ -70,17 +66,23 @@ void RoverApplication::setupCompleted() {
   // current, but required for stable streaming.
   WiFi.setSleep(false);
   Log.begin();
-  Log.printf("Wi-Fi connected. IP: %s  mDNS: http://%s.local:%d\n",
+  Log.printf("Wi-Fi connected. IP: %s  mDNS: %s.local\n",
              WiFi.localIP().toString().c_str(),
-             this->config.mdnsDiscoveryName,
-             this->config.webServerPort);
-  Log.printf("Telnet log: nc %s 23\n", WiFi.localIP().toString().c_str());
+             this->config.mdnsDiscoveryName);
+  Log.printf("API:    POST http://%s.local:%d/api/cmd\n",
+             this->config.mdnsDiscoveryName, this->config.webServerPort);
+  Log.printf("WS:     ws://%s.local:%d/\n",
+             this->config.mdnsDiscoveryName, this->config.webSocketPort);
+  Log.printf("Camera: http://%s.local:81/stream\n", this->config.mdnsDiscoveryName);
+  Log.printf("OTA:    http://%s.local:%d/ota\n",
+             this->config.mdnsDiscoveryName, this->config.webServerPort);
+  Log.printf("Logs:   http://%s.local:%d/logs\n",
+             this->config.mdnsDiscoveryName, this->config.webServerPort);
+  Log.printf("Telnet: nc %s 23\n", WiFi.localIP().toString().c_str());
   postSetupBroadcaster->begin();
   isSetupComplete = true;
 
-#ifndef ROVER_NO_CAMERA
   startCameraServer();
-#endif
   otaManager.begin();
   carController.setDeadmanTimeout(this->config.deadmanTimeoutMs);
 #ifdef ROVER_FEATURE_DISTANCE

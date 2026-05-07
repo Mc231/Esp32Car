@@ -9,10 +9,8 @@
 #include "Command/TransportRegistry.h"
 #include "Control/MotorControl.h"
 #include "Manager/DistanceManager.h"
-#ifndef ROVER_NO_CAMERA
 #include "Camera/CameraManager.h"
 #include "esp_camera.h"
-#endif
 #include "Controller/RoverController.h"
 #include "Fs/FSImpl.h"
 #include "Monitor/SystemMonitor.h"
@@ -47,9 +45,7 @@ private:
   TransportRegistry transports;
   RoverWebServer webServer;
   RoverWebSocketServer webSocketServer;
-#ifndef ROVER_NO_CAMERA
   CameraManager cameraManager;
-#endif
   PostSetupAvailabilityBroadcaster* postSetupBroadcaster;
   OTAManager otaManager;
 
