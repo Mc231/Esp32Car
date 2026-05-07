@@ -5,6 +5,8 @@
 #include "WiFi/WiFiConfigManager.h"
 #include "RoverWebServer/RoverWebServer.h"
 #include "RoverWebSocket/RoverWebSocketServer.h"
+#include "Serial/RoverSerialServer.h"
+#include "EspNow/RoverEspNowServer.h"
 #include "Command/CommandDispatcher.h"
 #include "Command/TransportRegistry.h"
 #include "Control/MotorControl.h"
@@ -45,6 +47,8 @@ private:
   TransportRegistry transports;
   RoverWebServer webServer;
   RoverWebSocketServer webSocketServer;
+  RoverSerialServer serialTransport;
+  RoverEspNowServer espNowTransport;
   CameraManager cameraManager;
   PostSetupAvailabilityBroadcaster* postSetupBroadcaster;
   OTAManager otaManager;

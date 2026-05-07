@@ -19,6 +19,8 @@ RoverApplication::RoverApplication(const RoverApplicationConfig& cfg)
     transports(),
     webServer(config, commandDispatcher),
     webSocketServer(commandDispatcher, config),
+    serialTransport(commandDispatcher),
+    espNowTransport(commandDispatcher),
     cameraManager(),
     postSetupBroadcaster(new MDNSBroadcaster(config.mdnsDiscoveryName, {
         {"http",       "tcp", 80},
@@ -97,6 +99,8 @@ void RoverApplication::registerTransports() {
   // need them to flip the others via `set_transport`).
   transports.add(&webServer);
   transports.add(&webSocketServer);
+  transports.add(&serialTransport);
+  transports.add(&espNowTransport);
 
 #ifdef ROVER_FEATURE_MQTT
   RoverMqttClient::Config mc;
@@ -118,6 +122,8 @@ void RoverApplication::registerTransports() {
   // the build-time config and the host string is non-empty.
   webServer.begin();
   webSocketServer.begin();
+  serialTransport.begin();
+  espNowTransport.begin();
 #ifdef ROVER_FEATURE_MQTT
   if (config.mqttEnabled && config.mqttHost && config.mqttHost[0] != '\0') {
     mqttClient->begin();
