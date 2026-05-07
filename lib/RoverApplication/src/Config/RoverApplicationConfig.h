@@ -1,11 +1,9 @@
-
 #ifndef ROVERAPPLICATIONCONFIG_H
 #define ROVERAPPLICATIONCONFIG_H
 
 struct RoverApplicationConfig {
     const char* apSsid;
     const char* apPassword;
-    int setupServerPort;
     int webServerPort;
     int webSocketPort;
     const char* mdnsDiscoveryName;
@@ -16,21 +14,31 @@ struct RoverApplicationConfig {
     int rightMotorPin1;
     int rightMotorPin2;
     int rightMotorPwm;
-    // Single GPIO drives HC-SR04 in single-pin mode (TRIG+ECHO joined externally
-    // through a 1k resistor, line tapped via 1k/2k divider down to 3.3V).
+    // Sharp GP2Y0A21 IR distance sensor (analog out). Compiled only when
+    // ROVER_FEATURE_DISTANCE is defined; the pin is read from this field.
     int distanceSensorPin;
-    // HTTP basic auth for the control panel (port webServerPort).
-    // Both empty = auth disabled.
+    // HTTP basic auth for the control HTTP server (POST /api/cmd, /ota,
+    // /logs). Both empty = auth disabled.
     const char* adminUser;
     const char* adminPassword;
     // Deadman: auto-stop motors if no driving command arrives within this window.
     // 0 = disabled. Default: 1500 ms.
     unsigned long deadmanTimeoutMs;
 
+    // MQTT bridge settings — only consulted when the firmware is built
+    // with -DROVER_FEATURE_MQTT. host empty → MQTT stays off even if
+    // mqttEnabled is true. Override per-rover from main.cpp.
+    bool        mqttEnabled;
+    const char* mqttHost;
+    int         mqttPort;
+    const char* mqttUser;
+    const char* mqttPassword;
+    const char* mqttClientId;     // empty → derived from MAC at boot
+    const char* mqttTopicPrefix;  // empty → "rover"
+
      RoverApplicationConfig()
         : apSsid("Rover"),
           apPassword("123456789"),
-          setupServerPort(80),
           webServerPort(32231),
           webSocketPort(32232),
           mdnsDiscoveryName("Rover"),
@@ -57,7 +65,14 @@ struct RoverApplicationConfig {
 #endif
           adminUser(""),
           adminPassword(""),
-          deadmanTimeoutMs(1500) { }
+          deadmanTimeoutMs(1500),
+          mqttEnabled(false),
+          mqttHost(""),
+          mqttPort(1883),
+          mqttUser(""),
+          mqttPassword(""),
+          mqttClientId(""),
+          mqttTopicPrefix("") { }
 };
 
 #endif // ROVERAPPLICATIONCONFIG_H

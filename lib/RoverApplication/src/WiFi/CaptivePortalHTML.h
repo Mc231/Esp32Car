@@ -231,66 +231,6 @@ const char captivePortalHTML[] PROGMEM = R"rawliteral(
   .status.error   { background: rgba(255,107,107,.12); color: var(--error); }
 
   footer { text-align: center; color: var(--text-dim); font-size: 12px; margin-top: 18px; }
-
-  /* Advanced section */
-  details.advanced {
-    margin-top: 0;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: var(--bg-elev);
-    padding: 0;
-  }
-  details.advanced > summary {
-    list-style: none;
-    cursor: pointer;
-    padding: 12px 14px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: .08em;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  details.advanced > summary::-webkit-details-marker { display: none; }
-  details.advanced > summary::after {
-    content: '\\002B';   /* + */
-    font-size: 18px;
-    font-weight: 400;
-    color: var(--text-dim);
-  }
-  details.advanced[open] > summary::after { content: '\\2212'; /* − */ }
-  .adv-body { padding: 4px 14px 14px; display: grid; gap: 10px; }
-  .adv-body .grp { display: grid; gap: 6px; }
-  .adv-body label {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    color: var(--text-dim);
-    font-weight: 600;
-  }
-  .adv-body input[type="text"], .adv-body input[type="number"], .adv-body input[type="password"] {
-    padding: 10px 12px;
-    background: var(--bg-card);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    font-size: 14px;
-    outline: none;
-  }
-  .adv-body input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(91,140,255,.18); }
-  .adv-body .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .adv-body .toggle {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 8px 0; font-size: 13px;
-  }
-  .adv-body .toggle input { width: 18px; height: 18px; }
-  .adv-body .section-title {
-    font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
-    color: var(--text); font-weight: 700; margin-top: 8px;
-  }
-  .adv-body .hint { font-size: 11px; color: var(--text-dim); margin: 0; }
 </style>
 </head>
 <body>
@@ -338,49 +278,6 @@ const char captivePortalHTML[] PROGMEM = R"rawliteral(
       </button>
     </div>
   </section>
-
-  <details class="advanced card" id="advanced">
-    <summary>Advanced (optional)</summary>
-    <div class="adv-body">
-      <p class="hint">Saved when you press Connect.</p>
-
-      <div class="section-title">MQTT</div>
-      <div class="toggle">
-        <span>Enable MQTT</span>
-        <input type="checkbox" id="mqtt_enabled">
-      </div>
-      <div class="row-2">
-        <div class="grp">
-          <label for="mqtt_host">Broker host</label>
-          <input type="text" id="mqtt_host" placeholder="192.168.1.10" autocapitalize="off" autocorrect="off" spellcheck="false">
-        </div>
-        <div class="grp">
-          <label for="mqtt_port">Port</label>
-          <input type="number" id="mqtt_port" placeholder="1883" min="1" max="65535">
-        </div>
-      </div>
-      <div class="row-2">
-        <div class="grp">
-          <label for="mqtt_user">User (optional)</label>
-          <input type="text" id="mqtt_user" autocapitalize="off" autocorrect="off" spellcheck="false">
-        </div>
-        <div class="grp">
-          <label for="mqtt_password">Password</label>
-          <input type="password" id="mqtt_password" placeholder="(unchanged)" autocomplete="new-password">
-        </div>
-      </div>
-      <div class="row-2">
-        <div class="grp">
-          <label for="mqtt_client_id">Client ID</label>
-          <input type="text" id="mqtt_client_id" placeholder="auto from MAC" autocapitalize="off" autocorrect="off" spellcheck="false">
-        </div>
-        <div class="grp">
-          <label for="mqtt_topic_prefix">Topic prefix</label>
-          <input type="text" id="mqtt_topic_prefix" placeholder="rover" autocapitalize="off" autocorrect="off" spellcheck="false">
-        </div>
-      </div>
-    </div>
-  </details>
 
   <section class="card">
     <button id="connectBtn" class="primary" disabled>Connect</button>
@@ -466,42 +363,6 @@ const char captivePortalHTML[] PROGMEM = R"rawliteral(
       .finally(() => refreshBtn.classList.remove('spinning'));
   }
 
-  // Advanced section: MQTT + BLE settings.
-  function val(id) { const e = document.getElementById(id); return e ? e.value : ''; }
-  function checked(id) { const e = document.getElementById(id); return !!(e && e.checked); }
-
-  function loadAdvanced() {
-    fetch('/advanced')
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (!d) return;
-        if (d.mqtt) {
-          document.getElementById('mqtt_enabled').checked = !!d.mqtt.enabled;
-          document.getElementById('mqtt_host').value     = d.mqtt.host || '';
-          document.getElementById('mqtt_port').value     = d.mqtt.port || 1883;
-          document.getElementById('mqtt_user').value     = d.mqtt.user || '';
-          document.getElementById('mqtt_client_id').value    = d.mqtt.clientId || '';
-          document.getElementById('mqtt_topic_prefix').value = d.mqtt.topicPrefix || '';
-        }
-      })
-      .catch(() => {});
-  }
-
-  function buildBody() {
-    const parts = [
-      'ssid=' + encodeURIComponent(selectedSsid),
-      'password=' + encodeURIComponent(passwordEl.value),
-      'mqtt_enabled=' + (checked('mqtt_enabled') ? '1' : '0'),
-      'mqtt_host=' + encodeURIComponent(val('mqtt_host')),
-      'mqtt_port=' + encodeURIComponent(val('mqtt_port') || '1883'),
-      'mqtt_user=' + encodeURIComponent(val('mqtt_user')),
-      'mqtt_password=' + encodeURIComponent(val('mqtt_password')),
-      'mqtt_client_id=' + encodeURIComponent(val('mqtt_client_id')),
-      'mqtt_topic_prefix=' + encodeURIComponent(val('mqtt_topic_prefix')),
-    ];
-    return parts.join('&');
-  }
-
   function connect() {
     if (!selectedSsid) { setStatus('error', 'Pick a network first.'); return; }
 
@@ -511,7 +372,8 @@ const char captivePortalHTML[] PROGMEM = R"rawliteral(
     fetch('/connect', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: buildBody()
+      body: 'ssid=' + encodeURIComponent(selectedSsid) +
+            '&password=' + encodeURIComponent(passwordEl.value)
     })
     .then(r => {
       if (r.ok) {
@@ -537,7 +399,6 @@ const char captivePortalHTML[] PROGMEM = R"rawliteral(
   passwordEl.addEventListener('keydown', e => { if (e.key === 'Enter') connect(); });
 
   scan();
-  loadAdvanced();
 })();
 </script>
 </body>

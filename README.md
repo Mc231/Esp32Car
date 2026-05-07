@@ -6,7 +6,7 @@ A Wi-Fi controlled rover built on the AI-Thinker ESP32-CAM (and ESP32-WROVER var
 
 ## Features
 
-- **First-run captive portal** — connect to the rover's `Rover` Wi-Fi AP, pick your home network, and (optionally) configure an MQTT broker from the same page. Rover persists everything and reboots into station mode.
+- **First-run captive portal** — connect to the rover's `Rover` Wi-Fi AP, pick your home network. Rover persists Wi-Fi creds and reboots into station mode. MQTT broker config lives in the build-time `RoverApplicationConfig` (see `src/main.cpp`).
 - **Standalone web UI** at `web/` — camera stream, on-screen D-pad, keyboard arrow keys, speed slider, live telemetry overlays, multi-rover picker, recording + reverse-replay, autonomous obstacle-avoidance. Pure browser, no build step.
 - **Camera streaming** — MJPEG from the OV2640 on its own server (port 81).
 - **Unified JSON command surface** across three transports — same envelope (`{"command":"…"}`), same handlers, different pipes:
@@ -151,8 +151,7 @@ All four transports accept the **same JSON envelope**. Body shape: `{"command": 
 | `set_camera`     | `frame_size` (0-13)                                 | switches MJPEG resolution                     |
 | `reboot`         | —                                                   | replies, then restarts                        |
 | `transports`     | —                                                   | list of registered transports + running state |
-| `set_transport`  | `name` ("mqtt"), `enabled` (bool)                   | start/stop a transport at runtime; persists for next boot |
-| `set_mqtt_config` | any of: `host`, `port`, `user`, `password`, `clientId`, `topicPrefix`, `enabled` | hot-reload MQTT broker without reboot. Stops, swaps config, optionally re-starts. Partial updates supported. Persists. |
+| `set_transport`  | `name` ("mqtt"), `enabled` (bool)                   | start/stop a transport at runtime. In-memory only — boot defaults come from `RoverApplicationConfig`. |
 
 **MQTT extras:** when MQTT is enabled, the rover also auto-publishes a combined telemetry frame to `rover/<id>/telemetry` every 2 s (no command needed) and a retained `online`/`offline` LWT on `rover/<id>/status`.
 
@@ -173,13 +172,14 @@ All defaults live in [`lib/RoverApplication/src/Config/RoverApplicationConfig.h`
 #include <RoverApplication.h>
 
 RoverApplicationConfig cfg;
-cfg.apSsid                  = "MyRover";
-cfg.apPassword              = "supersecret";
-cfg.adminUser               = "admin";        // enable HTTP basic auth
-cfg.adminPassword           = "yourpass";     // empty = auth disabled
-cfg.ultrasonicSensorEnabled = true;
-cfg.ultrasonicPin1          = 16;             // TRIG
-cfg.ultrasonicPin2          = 33;             // ECHO
+cfg.apSsid          = "MyRover";
+cfg.apPassword      = "supersecret";
+cfg.adminUser       = "admin";              // enable HTTP basic auth
+cfg.adminPassword   = "yourpass";           // empty = auth disabled
+cfg.mqttEnabled     = true;                 // requires -DROVER_FEATURE_MQTT
+cfg.mqttHost        = "192.168.1.10";
+cfg.mqttUser        = "rover";
+cfg.mqttPassword    = "secret";
 
 RoverApplication roverApp(cfg);
 
@@ -189,15 +189,21 @@ void loop()  { roverApp.loop(); }
 
 ### Notable settings
 
-| Field                       | Default      | Notes                                              |
-| --------------------------- | ------------ | -------------------------------------------------- |
-| `apSsid` / `apPassword`     | `Rover` / `123456789` | Setup-mode AP                             |
-| `webServerPort`             | `32231`      | HTTP `/api/cmd` + OTA + logs pages                 |
-| `webSocketPort`             | `32232`      | WebSocket                                          |
-| `mdnsDiscoveryName`         | `Rover`      | Resolves as `<name>.local`                         |
-| `serialBaud`                | `115200`     | Match your serial monitor                          |
-| `ultrasonicSensorEnabled`   | `false`      | Disabled by default — see *Adding Ultrasonic*      |
-| `adminUser` / `adminPassword` | empty      | HTTP basic auth on REST; both empty = disabled     |
+| Field                         | Default               | Notes                                                  |
+| ----------------------------- | --------------------- | ------------------------------------------------------ |
+| `apSsid` / `apPassword`       | `Rover` / `123456789` | Setup-mode AP                                          |
+| `webServerPort`               | `32231`               | HTTP `/api/cmd` + OTA + logs pages                     |
+| `webSocketPort`               | `32232`               | WebSocket                                              |
+| `mdnsDiscoveryName`           | `Rover`               | Resolves as `<name>.local`                             |
+| `serialBaud`                  | `115200`              | Match your serial monitor                              |
+| `distanceSensorPin`           | board-dependent       | Sharp GP2Y0A21 analog out. Compile with `-DROVER_FEATURE_DISTANCE` to enable. |
+| `adminUser` / `adminPassword` | empty                 | HTTP basic auth on the control HTTP server; both empty = disabled |
+| `mqttEnabled`                 | `false`               | MQTT bridge on/off. Only consulted when `-DROVER_FEATURE_MQTT` is set. |
+| `mqttHost` / `mqttPort`       | empty / `1883`        | Broker address. Empty host disables MQTT regardless of `mqttEnabled`. |
+| `mqttUser` / `mqttPassword`   | empty                 | Broker auth (optional)                                 |
+| `mqttClientId`                | empty                 | Empty → derived from MAC at boot                       |
+| `mqttTopicPrefix`             | empty                 | Empty → `"rover"`                                      |
+| `deadmanTimeoutMs`            | `1500`                | Auto-stop motors if no driving command in this window. 0 = disabled. |
 
 ---
 
@@ -260,7 +266,7 @@ Esp32Car/
 │   ├── RoverWebServer/             # HTTP transport: /api/cmd + OTA + logs (port 32231)
 │   ├── RoverWebSocket/             # WebSocket transport (port 32232)
 │   ├── Mqtt/                       # MQTT bridge (opt-in, ROVER_FEATURE_MQTT)
-│   └── WiFi/                       # Setup manager + captive portal HTML + persisted config
+│   └── WiFi/                       # Setup manager + captive portal HTML + persisted Wi-Fi creds
 ├── web/                            # Standalone browser app — the rover's UI
 └── data/                           # Empty; reserved for future SPIFFS-served assets
 ```

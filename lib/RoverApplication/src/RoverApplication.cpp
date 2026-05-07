@@ -8,8 +8,7 @@ RoverApplication::RoverApplication(const RoverApplicationConfig& cfg)
     abstractFs(new FSImpl()),
     config(cfg),
     wiFiConfigManager(*abstractFs),
-    runtimeConfig(*abstractFs),
-    setupManager(new WiFiSetupManager(wiFiConfigManager, runtimeConfig, config.apSsid, config.apPassword)),
+    setupManager(new WiFiSetupManager(wiFiConfigManager, config.apSsid, config.apPassword)),
     // LEDC channels 4 and 5 — chosen to avoid esp_camera's XCLK on channel 0.
     leftMotor(config.leftMotorPin1, config.leftMotorPin2, config.leftMotorPwm, 4),
     rightMotor(config.rightMotorPin1, config.rightMotorPin2, config.rightMotorPwm, 5),
@@ -97,31 +96,31 @@ void RoverApplication::registerTransports() {
   transports.add(&webServer);
   transports.add(&webSocketServer);
 
-  const auto& rc = runtimeConfig.read();
-
 #ifdef ROVER_FEATURE_MQTT
   RoverMqttClient::Config mc;
-  mc.host        = std::string(rc.mqttHost.c_str());
-  mc.port        = static_cast<uint16_t>(rc.mqttPort);
-  mc.user        = std::string(rc.mqttUser.c_str());
-  mc.password    = std::string(rc.mqttPassword.c_str());
-  mc.clientId    = std::string(rc.mqttClientId.c_str());
-  mc.topicPrefix = std::string(rc.mqttTopicPrefix.c_str());
+  mc.host        = config.mqttHost ? std::string(config.mqttHost) : std::string();
+  mc.port        = static_cast<uint16_t>(config.mqttPort);
+  mc.user        = config.mqttUser ? std::string(config.mqttUser) : std::string();
+  mc.password    = config.mqttPassword ? std::string(config.mqttPassword) : std::string();
+  mc.clientId    = config.mqttClientId ? std::string(config.mqttClientId) : std::string();
+  mc.topicPrefix = config.mqttTopicPrefix ? std::string(config.mqttTopicPrefix) : std::string();
   mqttClient = new RoverMqttClient(commandDispatcher, mc);
   transports.add(mqttClient);
 #endif
 
-  // Wire the registry + runtime config into the dispatcher so the
-  // `transports` and `set_transport` commands can find/toggle/persist.
+  // Wire the registry into the dispatcher so the `transports` and
+  // `set_transport` commands can find + toggle transports.
   commandDispatcher.setTransportRegistry(&transports);
-  commandDispatcher.setRuntimeConfig(&runtimeConfig);
 
-  // Start always-on transports unconditionally; optional ones only if
-  // their runtime flag is set.
+  // Start always-on transports unconditionally; MQTT only if enabled in
+  // the build-time config and the host string is non-empty.
   webServer.begin();
   webSocketServer.begin();
 #ifdef ROVER_FEATURE_MQTT
-  if (rc.mqttEnabled && rc.mqttHost.length() > 0) mqttClient->begin();
-  else Log.println("[mqtt] disabled in runtime config");
+  if (config.mqttEnabled && config.mqttHost && config.mqttHost[0] != '\0') {
+    mqttClient->begin();
+  } else {
+    Log.println("[mqtt] disabled (config.mqttEnabled false or host empty)");
+  }
 #endif
 }

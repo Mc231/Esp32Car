@@ -9,13 +9,12 @@
 #include <nlohmann/json.hpp>
 #include "Controller/RoverController.h"
 #include "Config/RoverApplicationConfig.h"
-#include "Config/RuntimeConfigManager.h"
 #include "Monitor/SystemMonitor.h"
 #include "TransportRegistry.h"
 
 // Transport-agnostic JSON command dispatcher.
 //
-// The WebSocket / BLE / MQTT servers are thin transports — they receive
+// The HTTP / WebSocket / MQTT transports are thin adapters — they receive
 // raw bytes, hand them here, and pipe the response JSON back via the
 // `respond` callback. Same command surface, three different pipes.
 //
@@ -38,18 +37,16 @@ public:
   // through the command parsing path. Used by MQTT's periodic publisher.
   std::string buildTelemetry();
 
-  // Optional wiring for the runtime transport-toggle commands. When both
-  // are set, `transports` and `set_transport` work; otherwise the
-  // dispatcher returns an "unavailable" status for them.
+  // Optional registry wiring for the runtime transport-toggle commands.
+  // When unset, `transports` and `set_transport` return an "unavailable"
+  // status.
   void setTransportRegistry(TransportRegistry* r) { registry = r; }
-  void setRuntimeConfig(RuntimeConfigManager* rc) { runtimeConfigMgr = rc; }
 
 private:
   RoverController& controller;
   RoverApplicationConfig config;
   SystemMonitor& systemMonitor;
   TransportRegistry* registry = nullptr;
-  RuntimeConfigManager* runtimeConfigMgr = nullptr;
 
   void handleSystem(const ReplyFn& respond);
   void handleStatus(const ReplyFn& respond);
@@ -64,7 +61,6 @@ private:
   void handleSetMotor(const nlohmann::json& j, const ReplyFn& respond);
   void handleListTransports(const ReplyFn& respond);
   void handleSetTransport(const nlohmann::json& j, const ReplyFn& respond);
-  void handleSetMqttConfig(const nlohmann::json& j, const ReplyFn& respond);
 
   // Build a JSON-serialized response from a std::map<std::string, std::any>.
   std::string serialize(const std::map<std::string, std::any>& dataMap) const;

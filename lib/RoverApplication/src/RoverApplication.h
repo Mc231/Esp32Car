@@ -3,7 +3,6 @@
 
 #include "WiFi/WiFiSetupManager.h"
 #include "WiFi/WiFiConfigManager.h"
-#include "Config/RuntimeConfigManager.h"
 #include "RoverWebServer/RoverWebServer.h"
 #include "RoverWebSocket/RoverWebSocketServer.h"
 #include "Command/CommandDispatcher.h"
@@ -38,7 +37,6 @@ private:
   AbstractFS* abstractFs;
   RoverApplicationConfig config;
   WiFiConfigManager wiFiConfigManager;
-  RuntimeConfigManager runtimeConfig;
   AbstractWiFiSetupManager* setupManager;
   MotorManager leftMotor;
   MotorManager rightMotor;
