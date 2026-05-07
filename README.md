@@ -282,8 +282,50 @@ Esp32Car/
 
 - **`RoverApplication` is a global** in `main.cpp`. Any code that needs FreeRTOS (e.g. `SPIFFS.begin(true)` formatting) must run from `setup()`, not from a constructor — `WiFiConfigManager` lazily mounts the FS for this reason.
 - **`std::any` map** is used for telemetry payloads; `asJSON()` serializes via non-throwing pointer-form `std::any_cast<T>(&v)`.
-- **Single mutex** (`SemaphoreHandle_t`) inside `RoverController` protects motor / ultrasonic state from races between HTTP and WebSocket handlers.
-- **Ultrasonic capture is interrupt-driven** with an atomic ready flag; main loop calls `update()` and reads cached distance.
+- **Single mutex** (`SemaphoreHandle_t`) inside `RoverController` protects motor / distance state from races between transports.
+- **Distance capture is polled** via `analogRead()` with oversampling — the Sharp GP2Y0A21 is an analog sensor.
+
+---
+
+## Tests
+
+Two test suites — host-side, no flashing required.
+
+### Web (vitest + jsdom)
+
+```bash
+cd web
+npm install
+npm test            # one-shot
+npm run test:watch  # interactive
+npm run coverage    # text + HTML report under coverage/
+```
+
+Covers `autonomous.js` (state machine), `recording.js` (replay engine),
+`ws.js` (FIFO + reconnect + timeout), `store.js` (localStorage),
+`toast.js` (DOM). 100% line coverage on those modules; **60 tests**.
+Page-entry glue (`control.js`, `picker.js`, `controls-input.js`) is
+DOM-orchestration code and intentionally not unit-tested.
+
+### Firmware (PlatformIO + Unity, host-native)
+
+```bash
+pio test -e native
+```
+
+Compiles on the host (no flash, no device). Stubs in `test/native_stubs/`
+provide host-friendly versions of `Arduino.h`, `RoverController`,
+`SystemMonitor`, `RemoteLogger`, etc. so the tested code links without
+FreeRTOS / Wi-Fi / camera deps.
+
+Currently covers:
+- `TransportRegistry` — add/find/loopAll/stopAll, idempotency
+- `CommandDispatcher` — every command in the protocol, parser error
+  paths, reply shape, transport-toggle commands
+
+**36 tests**. Hardware-touching code (transport adapters, motor/distance
+managers, camera, OTA) needs on-device tests for real coverage — those
+aren't set up here.
 
 ---
 

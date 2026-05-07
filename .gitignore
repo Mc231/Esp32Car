@@ -4,3 +4,7 @@
 .vscode/launch.json
 .vscode/ipch
 data/config.cfg
+
+# Web app test artefacts
+web/node_modules/
+web/coverage/
