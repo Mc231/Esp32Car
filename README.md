@@ -1,17 +1,16 @@
 # ESP32-CAM Rover
 
-A Wi-Fi controlled rover built on the AI-Thinker ESP32-CAM (and ESP32-WROVER variant). Streams video, drives differential-drive motors via an L298N (or compatible) driver, and exposes a unified JSON command surface across **HTTP, WebSocket, and MQTT** transports. Self-hosts a control page; a richer multi-rover UI also lives in the standalone `web/` app.
+A Wi-Fi controlled rover built on the AI-Thinker ESP32-CAM (and ESP32-WROVER variant). Streams video, drives differential-drive motors via an L298N (or compatible) driver, and exposes a unified JSON command surface across **HTTP, WebSocket, and MQTT** transports. UI lives in the standalone `web/` app.
 
 ---
 
 ## Features
 
 - **First-run captive portal** — connect to the rover's `Rover` Wi-Fi AP, pick your home network, and (optionally) configure an MQTT broker from the same page. Rover persists everything and reboots into station mode.
-- **Firmware-served control page** at `http://Rover.local:32231/` — camera stream, on-screen D-pad, keyboard arrow keys, speed slider, live telemetry overlays, settings drawer with hardware info and Forget Wi-Fi/Reboot. Hosts itself; no external server needed.
-- **Standalone web UI** at `web/` — multi-rover picker, recording + reverse-replay, autonomous obstacle-avoidance. Pure browser, no build step.
+- **Standalone web UI** at `web/` — camera stream, on-screen D-pad, keyboard arrow keys, speed slider, live telemetry overlays, multi-rover picker, recording + reverse-replay, autonomous obstacle-avoidance. Pure browser, no build step.
 - **Camera streaming** — MJPEG from the OV2640 on its own server (port 81).
 - **Unified JSON command surface** across three transports — same envelope (`{"command":"…"}`), same handlers, different pipes:
-  - **HTTP** `POST /api/cmd` on port 32231 (alongside legacy REST routes that the firmware HTML page uses)
+  - **HTTP** `POST /api/cmd` on port 32231
   - **WebSocket** on port 32232 (used by the standalone web app)
   - **MQTT** publish/subscribe on `rover/<id>/cmd|response|telemetry|status` (opt-in env, configurable broker)
 - **mDNS discovery** — reachable at `Rover.local`, advertises camera/control/WS services for zeroconf browsers.
@@ -125,14 +124,9 @@ The serial log also prints the IP and mDNS URL right after Wi-Fi connects.
 
 ## Using the rover
 
-Three ways in:
+There is no firmware-served HTML — point any of the three transports at the rover.
 
-- **Browser to firmware page:** `http://Rover.local:32231/` — the rover serves a built-in HTML control panel with d-pad, camera, telemetry, settings.
-- **Browser to standalone web app:** open `web/index.html` over a local HTTP server (see `web/README.md`). Uses the WebSocket transport. Multi-rover picker + recording + autonomous mode.
-- **Programmatic:** any of the JSON transports below.
-
-JSON command surface (HTTP / WS / MQTT all accept the same envelope):
-
+- **Browser:** open the standalone web app in `web/` over a local HTTP server (see `web/README.md`). Uses the WebSocket transport.
 - **HTTP:** `curl -X POST http://Rover.local:32231/api/cmd -d '{"command":"system"}'`
 - **WS:** `ws://Rover.local:32232/` — send a JSON frame, receive a JSON reply.
 - **MQTT:** publish to `rover/<id>/cmd`, subscribe to `rover/<id>/response` and `rover/<id>/telemetry`.
@@ -260,11 +254,10 @@ Esp32Car/
 │   ├── Control/                    # MotorControl + MotorManager
 │   ├── Controller/                 # RoverController — central state, mutex-guarded
 │   ├── Fs/                         # AbstractFS + SPIFFS impl
-│   ├── Html/                       # Firmware-served HTML control page (PROGMEM)
 │   ├── Manager/                    # DistanceManager (Sharp GP2Y0A21 IR — ROVER_FEATURE_DISTANCE)
 │   ├── Monitor/                    # SystemMonitor — uptime, free heap
 │   ├── PostSetupBroadcaster/       # mDNS service broadcaster
-│   ├── RoverWebServer/             # HTTP transport: control HTML + REST + /api/cmd + OTA + logs (port 32231)
+│   ├── RoverWebServer/             # HTTP transport: /api/cmd + OTA + logs (port 32231)
 │   ├── RoverWebSocket/             # WebSocket transport (port 32232)
 │   ├── Mqtt/                       # MQTT bridge (opt-in, ROVER_FEATURE_MQTT)
 │   └── WiFi/                       # Setup manager + captive portal HTML + persisted config

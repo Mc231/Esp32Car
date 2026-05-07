@@ -18,7 +18,7 @@ RoverApplication::RoverApplication(const RoverApplicationConfig& cfg)
     carController(wiFiConfigManager, motorControl, distanceManager),
     commandDispatcher(carController, config, systemMonitor),
     transports(),
-    webServer(carController, config, systemMonitor, commandDispatcher),
+    webServer(config, commandDispatcher),
     webSocketServer(commandDispatcher, config),
 #ifndef ROVER_NO_CAMERA
     cameraManager(),

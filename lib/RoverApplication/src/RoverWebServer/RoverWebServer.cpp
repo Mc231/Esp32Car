@@ -1,14 +1,9 @@
 #include "RoverWebServer.h"
-#include "Html/control_html.h"
 #include "Log/RemoteLogger.h"
 #include <Update.h>
 
-RoverWebServer::RoverWebServer(RoverController& carController,
-                               const RoverApplicationConfig& config,
-                               SystemMonitor& systemMonitor,
-                               CommandDispatcher& dispatcher)
-  : carController(carController), config(config), systemMonitor(systemMonitor),
-    dispatcher(dispatcher), server(config.webServerPort)
+RoverWebServer::RoverWebServer(const RoverApplicationConfig& config, CommandDispatcher& dispatcher)
+  : config(config), dispatcher(dispatcher), server(config.webServerPort)
 {}
 
 bool RoverWebServer::authorized() {
@@ -25,25 +20,8 @@ bool RoverWebServer::authorized() {
 
 void RoverWebServer::begin() {
   if (running) return;
-  // Firmware-served control panel at GET /.
-  server.on("/", HTTP_GET, [this]() { handleRoot(); });
-
-  // Legacy per-route REST API (the firmware HTML calls these).
-  server.on("/reboot", HTTP_POST, [this]() { handleReboot(); });
-  server.on("/wifi", HTTP_GET, [this]() { handleGetWiFi(); });
-  server.on("/wifi/forget", HTTP_POST, [this]() { handleWiFiForget(); });
-  server.on("/motor", HTTP_PUT, [this]() { handleSetMotor(); });
-  server.on("/motor", HTTP_GET, [this]() { handleMotorState(); });
-  server.on("/distance", HTTP_GET, [this]() { handleGetDistance(); });
-  server.on("/motorPWM", HTTP_PUT, [this]() { handleSetMotorPWM(); });
-  server.on("/camera", HTTP_PUT, [this]() { handleCamera(); });
-  server.on("/system", HTTP_GET, [this]() { handleSystem(); });
-  server.on("/status", HTTP_GET, [this]() { handleStatus(); });
-  server.on("/config", HTTP_GET, [this]() { handleConfig(); });
-
-  // Unified JSON command surface (HTTP, WS, MQTT, … all use this shape).
+  // Unified JSON command surface.
   server.on("/api/cmd", HTTP_POST, [this]() { handleApiCommand(); });
-
   // Utility pages.
   server.on("/ota", HTTP_GET, [this]() { handleOtaPage(); });
   server.on("/ota/upload", HTTP_POST,
@@ -69,8 +47,6 @@ void RoverWebServer::handleClient() {
   if (running) server.handleClient();
 }
 
-// ===== Unified command surface =====
-
 void RoverWebServer::handleApiCommand() {
   if (!authorized()) return;
   if (!server.hasArg("plain")) {
@@ -85,133 +61,6 @@ void RoverWebServer::handleApiCommand() {
   });
   if (got) server.send(200, "application/json", captured.c_str());
   else     server.send(400, "application/json", "{\"error\":\"unknown_command\"}");
-}
-
-// ===== Legacy REST handlers =====
-
-void RoverWebServer::handleRoot() {
-  if (!authorized()) return;
-  server.send(200, "text/html", (const char*)control_index_html);
-}
-
-void RoverWebServer::handleReboot() {
-  if (!authorized()) return;
-  server.send(200, "text/plain", "Rebooting");
-  carController.reboot();
-}
-
-void RoverWebServer::handleGetWiFi() {
-  if (!authorized()) return;
-  sendData(carController.getWiFiConfig());
-}
-
-void RoverWebServer::handleWiFiForget() {
-  if (!authorized()) return;
-  carController.forgotWiFi();
-  server.send(200, "text/plain", "Wi-Fi config forgotten. Restarting...");
-  carController.reboot();
-}
-
-void RoverWebServer::handleSetMotor() {
-  if (!authorized()) return;
-  if (!server.hasArg("plain")) { server.send(400, "text/plain", "Body not found"); return; }
-  try {
-    auto j = json::parse(server.arg("plain").c_str());
-    if (!j.contains("action") || !j.contains("motor")) {
-      server.send(400, "text/plain", "Missing 'action' or 'motor'");
-      return;
-    }
-    MotorAction action = static_cast<MotorAction>(j["action"].get<int>());
-    MotorSelection selection = static_cast<MotorSelection>(j["motor"].get<int>());
-    carController.setMotorAction(action, selection);
-    server.send(204);
-  } catch (const std::exception& e) {
-    server.send(400, "text/plain", String("Invalid JSON: ") + e.what());
-  }
-}
-
-void RoverWebServer::handleSetMotorPWM() {
-  if (!authorized()) return;
-  if (!server.hasArg("plain")) { server.send(400, "text/plain", "Body not found"); return; }
-  try {
-    auto j = json::parse(server.arg("plain").c_str());
-    if (!j.contains("pwm") || !j.contains("motor")) {
-      server.send(400, "text/plain", "Missing 'pwm' or 'motor'");
-      return;
-    }
-    MotorSelection selection = static_cast<MotorSelection>(j["motor"].get<int>());
-    int pwmValue = std::stoi(j["pwm"].get<std::string>());
-    carController.setMotorSpeed(selection, pwmValue);
-    server.send(204);
-  } catch (const std::exception& e) {
-    server.send(400, "text/plain", String("Invalid JSON: ") + e.what());
-  }
-}
-
-void RoverWebServer::handleMotorState() {
-  if (!authorized()) return;
-  sendData(carController.getMotorState());
-}
-
-void RoverWebServer::handleGetDistance() {
-  if (!authorized()) return;
-#ifdef ROVER_FEATURE_DISTANCE
-  sendData(carController.getDistanceState());
-#else
-  server.send(501, "application/json",
-              "{\"status\":\"distance sensor not built into this firmware\"}");
-#endif
-}
-
-void RoverWebServer::handleCamera() {
-#ifdef ROVER_NO_CAMERA
-  server.send(501, "text/plain", "Camera not present in this build");
-#else
-  if (!authorized()) return;
-  if (!server.hasArg("plain")) { server.send(400, "text/plain", "Body not found"); return; }
-  try {
-    auto j = json::parse(server.arg("plain").c_str());
-    if (j.contains("frame_size")) {
-      int size = j["frame_size"].get<int>();
-      sensor_t* s = esp_camera_sensor_get();
-      if (s && s->pixformat == PIXFORMAT_JPEG) {
-        s->set_framesize(s, (framesize_t)size);
-      }
-    }
-    server.send(204);
-  } catch (const std::exception& e) {
-    server.send(400, "text/plain", String("Invalid JSON: ") + e.what());
-  }
-#endif
-}
-
-void RoverWebServer::handleSystem() {
-  if (!authorized()) return;
-  sendData(systemMonitor.getState());
-}
-
-void RoverWebServer::handleStatus() {
-  if (!authorized()) return;
-  std::map<std::string, std::any> result;
-  result["motor"]  = carController.getMotorState();
-#ifdef ROVER_FEATURE_DISTANCE
-  result["distance"] = carController.getDistanceState();
-#endif
-  result["system"] = systemMonitor.getState();
-  sendData(result);
-}
-
-void RoverWebServer::handleConfig() {
-  if (!authorized()) return;
-  std::map<std::string, std::any> result;
-  result["leftMotorPin1"]    = config.leftMotorPin1;
-  result["leftMotorPin2"]    = config.leftMotorPin2;
-  result["leftMotorPwm"]     = config.leftMotorPwm;
-  result["rightMotorPin1"]   = config.rightMotorPin1;
-  result["rightMotorPin2"]   = config.rightMotorPin2;
-  result["rightMotorPwm"]    = config.rightMotorPwm;
-  result["distanceSensorPin"] = config.distanceSensorPin;
-  sendData(result);
 }
 
 // ===== Utility pages: OTA + logs =====
@@ -230,7 +79,6 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .bar{margin-top:14px;height:8px;background:#131a30;border-radius:999px;overflow:hidden;display:none}
 .bar.show{display:block}.fill{height:100%;width:0;background:linear-gradient(90deg,var(--accent),#8a5bff);transition:width .15s}
 .msg{margin-top:12px;font-size:13px;text-align:center}.ok{color:#3ddc84}.err{color:#ff6b6b}
-a{color:var(--accent);text-decoration:none;font-size:13px;display:inline-block;margin-top:14px}
 </style></head><body>
 <div class="card">
 <h1>Firmware Update</h1>
@@ -239,7 +87,6 @@ a{color:var(--accent);text-decoration:none;font-size:13px;display:inline-block;m
 <button id="b" type="submit">Upload &amp; Flash</button>
 <div class="bar" id="bar"><div class="fill" id="fill"></div></div>
 <div class="msg" id="msg"></div></form>
-<a href="/">&larr; Back to control</a>
 </div>
 <script>
 const f=document.getElementById('f'),file=document.getElementById('file'),b=document.getElementById('b'),
@@ -309,7 +156,6 @@ pre::-webkit-scrollbar{width:8px}pre::-webkit-scrollbar-thumb{background:var(--b
 <span><span class="dot" id="dot"></span><span id="status">connecting</span></span>
 <button id="pauseBtn">Pause</button>
 <button id="clearBtn">Clear</button>
-<a class="btn" href="/">&larr; Control</a>
 </header>
 <pre id="log"></pre>
 <script>
@@ -373,25 +219,4 @@ void RoverWebServer::handleLogsData() {
   }
   out += "\"}";
   server.send(200, "application/json", out);
-}
-
-// ===== Helpers =====
-
-void RoverWebServer::sendData(const std::map<std::string, std::any>& dataMap, const String& responseType) {
-  json j = asJSON(dataMap);
-  String response = j.dump().c_str();
-  server.send(200, responseType.c_str(), response);
-}
-
-json RoverWebServer::asJSON(const std::map<std::string, std::any>& map) const {
-  json j;
-  for (const auto& [key, value] : map) {
-    if (auto p = std::any_cast<int>(&value))                            j[key] = *p;
-    else if (auto p = std::any_cast<float>(&value))                     j[key] = *p;
-    else if (auto p = std::any_cast<bool>(&value))                      j[key] = *p;
-    else if (auto p = std::any_cast<std::string>(&value))               j[key] = *p;
-    else if (auto p = std::any_cast<String>(&value))                    j[key] = p->c_str();
-    else if (auto p = std::any_cast<std::map<std::string, std::any>>(&value)) j[key] = asJSON(*p);
-  }
-  return j;
 }
