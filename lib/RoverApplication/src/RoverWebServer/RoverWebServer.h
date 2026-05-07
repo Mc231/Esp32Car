@@ -3,45 +3,33 @@
 
 #include <Arduino.h>
 #include <WebServer.h>
-#include "Controller/RoverController.h"
-#include "esp_camera.h"
 #include "Config/RoverApplicationConfig.h"
-#include "Monitor/SystemMonitor.h"
-#include <nlohmann/json.hpp>
+#include "Command/CommandDispatcher.h"
 
-using json = nlohmann::json;
-
+// HTTP transport — exposes the unified JSON command surface plus the
+// firmware utility pages (OTA upload, log viewer). The legacy per-route
+// REST handlers (/motor, /system, …) and the firmware-served control
+// HTML page were removed; the standalone `web/` app is the UI now and
+// new clients should POST `/api/cmd`.
 class RoverWebServer {
 public:
-  RoverWebServer(RoverController& carController, RoverApplicationConfig config, SystemMonitor&);
+  RoverWebServer(const RoverApplicationConfig& config, CommandDispatcher& dispatcher);
   void begin();
-  void handleReboot();
-  void handleGetWiFi();
-  void handleWiFiForget();
-  void handleSetMotor(); 
-  void handleSetMotorPWM();
-  void handleMotorState();
   void handleClient();
-  void handleGetDistance();
-  void handleCamera();
-  void handleRoot();
-  void handleSystem();
-  void handleStatus();
-  void handleConfig();
-  void handleOtaPage();
-  void handleOtaUpload();
-  void handleOtaUploadFinish();
-  void handleLogsPage();
-  void handleLogsData();
+
 private:
-  RoverController &carController;
   RoverApplicationConfig config;
-  SystemMonitor &systemMonitor;
+  CommandDispatcher& dispatcher;
   WebServer server;
-  json asJSON(const std::map<std::string, std::any>& map) const;
-  void sendData(const std::map<std::string, std::any>& dataMap, const String& responseType = "application/json");
-  // Returns true if the request is allowed to proceed. Sends 401 if not.
-  bool authorized();
+
+  void handleApiCommand();      // POST /api/cmd  — JSON in, JSON out
+  void handleOtaPage();         // GET  /ota
+  void handleOtaUpload();       // POST /ota/upload (multipart)
+  void handleOtaUploadFinish();
+  void handleLogsPage();        // GET  /logs
+  void handleLogsData();        // GET  /logs/data?since=N
+
+  bool authorized();            // 401 + return false when admin auth fails
 };
 
 #endif // ROVERWEBSERVER_H

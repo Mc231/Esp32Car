@@ -8,16 +8,20 @@ RoverApplication::RoverApplication(const RoverApplicationConfig& cfg)
     abstractFs(new FSImpl()),
     config(cfg),
     wiFiConfigManager(*abstractFs),
-    setupManager(new WiFiSetupManager(wiFiConfigManager, config.apSsid, config.apPassword)),
+    runtimeConfig(*abstractFs),
+    setupManager(new WiFiSetupManager(wiFiConfigManager, runtimeConfig, config.apSsid, config.apPassword)),
     // LEDC channels 4 and 5 — chosen to avoid esp_camera's XCLK on channel 0.
     leftMotor(config.leftMotorPin1, config.leftMotorPin2, config.leftMotorPwm, 4),
     rightMotor(config.rightMotorPin1, config.rightMotorPin2, config.rightMotorPwm, 5),
-    motorControl(leftMotor, rightMotor), 
+    motorControl(leftMotor, rightMotor),
     distanceManager(config.distanceSensorPin),
-    carController(wiFiConfigManager ,motorControl, distanceManager),
-    webServer(carController, config, systemMonitor),
-    webSocketServer(carController, config, systemMonitor),
+    carController(wiFiConfigManager, motorControl, distanceManager),
+    commandDispatcher(carController, config, systemMonitor),
+    webServer(config, commandDispatcher),
+    webSocketServer(commandDispatcher, config),
+#ifndef ROVER_NO_CAMERA
     cameraManager(),
+#endif
     postSetupBroadcaster(new MDNSBroadcaster(config.mdnsDiscoveryName, {
         {"http",       "tcp", 80},
         {"rover-ctrl", "tcp", static_cast<uint16_t>(config.webServerPort)},
@@ -32,9 +36,11 @@ RoverApplication::RoverApplication(const RoverApplicationConfig& cfg)
 void RoverApplication::setup() {
   Serial.begin(this->config.serialBaud);
   Log.printf("\nRover firmware build %s %s\n", __DATE__, __TIME__);
+#ifndef ROVER_NO_CAMERA
   // Camera before motors — both use LEDC, camera owns channel 0 for XCLK,
   // motors get explicit channels 4/5 in MotorManager so there's no clash.
   cameraManager.initialize();
+#endif
   motorControl.begin();
   initializeWiFi();
 }
@@ -51,6 +57,10 @@ void RoverApplication::loop() {
        if (this->config.distanceSensorEnabled) {
          distanceManager.update();
        }
+#ifdef ROVER_FEATURE_MQTT
+       if (mqttClient) mqttClient->loop();
+#endif
+       // BLE: NimBLE runs its own task — nothing to pump here.
     }
 }
 
@@ -75,11 +85,48 @@ void RoverApplication::setupCompleted() {
 
   webServer.begin();
   webSocketServer.begin();
+#ifndef ROVER_NO_CAMERA
   startCameraServer();
+#endif
   otaManager.begin();
   carController.setDeadmanTimeout(this->config.deadmanTimeoutMs);
   if (this->config.distanceSensorEnabled)
   {
     distanceManager.initialize();
   }
+
+  startOptionalServices();
+}
+
+void RoverApplication::startOptionalServices() {
+  const auto& rc = runtimeConfig.read();
+
+#ifdef ROVER_FEATURE_BLE
+  if (rc.bleEnabled) {
+    std::string name = rc.bleDeviceName.length() > 0
+                         ? std::string(rc.bleDeviceName.c_str())
+                         : std::string(config.mdnsDiscoveryName);
+    std::string pin = rc.blePin.length() > 0 ? std::string(rc.blePin.c_str()) : std::string("123456");
+    bleServer = new RoverBLEServer(commandDispatcher, name, pin);
+    bleServer->begin();
+  } else {
+    Log.println("[ble] disabled in runtime config");
+  }
+#endif
+
+#ifdef ROVER_FEATURE_MQTT
+  if (rc.mqttEnabled && rc.mqttHost.length() > 0) {
+    RoverMqttClient::Config mc;
+    mc.host        = std::string(rc.mqttHost.c_str());
+    mc.port        = static_cast<uint16_t>(rc.mqttPort);
+    mc.user        = std::string(rc.mqttUser.c_str());
+    mc.password    = std::string(rc.mqttPassword.c_str());
+    mc.clientId    = std::string(rc.mqttClientId.c_str());
+    mc.topicPrefix = std::string(rc.mqttTopicPrefix.c_str());
+    mqttClient = new RoverMqttClient(commandDispatcher, mc);
+    mqttClient->begin();
+  } else {
+    Log.println("[mqtt] disabled in runtime config");
+  }
+#endif
 }

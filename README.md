@@ -1,17 +1,21 @@
 # ESP32-CAM Rover
 
-A Wi-Fi controlled rover built on the AI-Thinker ESP32-CAM. Streams video, drives differential-drive motors via an L298N (or compatible) driver, and exposes a modern web control panel plus a JSON REST + WebSocket API.
+A Wi-Fi controlled rover built on the AI-Thinker ESP32-CAM (and ESP32-WROVER variant). Streams video, drives differential-drive motors via an L298N (or compatible) driver, and exposes a unified JSON command surface across **HTTP, WebSocket, MQTT, and BLE** transports. UI lives in the standalone `web/` app.
 
 ---
 
 ## Features
 
-- **First-run captive portal** — connect to the rover's `Rover` Wi-Fi AP, pick your home network from a polished dark-themed UI, and the rover persists credentials and reboots into station mode.
-- **Modern control panel** — responsive (mobile + desktop), camera stream, on-screen D-pad, keyboard arrow keys, speed slider, live telemetry overlays, settings drawer with hardware info, network details, Forget Wi-Fi, and Reboot.
-- **Camera streaming** — MJPEG stream from the OV2640 on its own server (port 80), framesize switchable from 96×96 to 1600×1200.
-- **REST API** on port 32231 (control) and **WebSocket** on port 32232 (low-latency control + telemetry).
-- **mDNS discovery** — reachable at `Rover.local`, advertises three services so any zeroconf browser sees the camera, control panel, and WebSocket separately.
-- **HTTP basic auth** support (off by default) on the control panel.
+- **First-run captive portal** — connect to the rover's `Rover` Wi-Fi AP, pick your home network, and (optionally) configure MQTT broker + BLE PIN from the same page. Rover persists everything and reboots into station mode.
+- **Standalone web UI** at `web/` — camera stream, on-screen D-pad, keyboard arrow keys, speed slider, live telemetry overlays, recording + reverse-replay, autonomous obstacle-avoidance mode. Multi-rover picker. Pure browser, no build step.
+- **Camera streaming** — MJPEG from the OV2640 on its own server (port 81).
+- **Unified JSON command surface** across four transports — same envelope (`{"command":"…"}`), same handlers, different pipes:
+  - **HTTP** `POST /api/cmd` on port 32231
+  - **WebSocket** on port 32232 (used by the standalone web app)
+  - **MQTT** publish/subscribe on `rover/<id>/cmd|response|telemetry|status` (opt-in, configurable broker)
+  - **BLE** GATT peripheral with CMD/STATE characteristics, static-passkey pairing (opt-in)
+- **mDNS discovery** — reachable at `Rover.local`, advertises camera/control/WS services for zeroconf browsers.
+- **HTTP basic auth** support (off by default) on the control HTTP server.
 - **Optional ultrasonic distance sensor** (HC-SR04) — disabled by default because the AI-Thinker board has very few free GPIOs.
 - **Production-shaped architecture** — dependency injection via a config struct, mutex-protected shared state, interrupt-driven sensor capture, abstract filesystem interface for testability.
 
@@ -109,45 +113,43 @@ The serial log also prints the IP and mDNS URL right after Wi-Fi connects.
 
 ---
 
-## Using the control panel
+## Using the rover
 
-Open `http://Rover.local:32231/` (or `http://<rover-ip>:32231/`).
+There is no on-device control HTML — point any of the four transports at the rover.
 
-| Element            | What it does                                                  |
-| ------------------ | ------------------------------------------------------------- |
-| **Top bar**        | Online dot, IP, uptime, free heap                             |
-| **Camera view**    | MJPEG stream from the rover                                   |
-| **Overlay stats**  | Live distance, motor states, current PWM                      |
-| **D-pad**          | Touch to drive — Forward / Back / Left / Right / Stop         |
-| **Speed slider**   | Sets PWM (0–255) for both motors when you release             |
-| **Keyboard**       | Arrow keys = drive, Spacebar = stop                           |
-| **Side buttons**   | Camera resolution, quick reboot                               |
-| **Settings drawer** (gear icon) | Camera resolution, telemetry interval, network info, hardware pin map, **Refresh Info**, **Forget Wi-Fi**, **Reboot Rover** |
-
-The page sends `stop` on browser tab blur so the rover doesn't keep driving when you switch apps.
+- **Browser:** open the standalone web app in `web/` (see `web/README.md`). It uses the WebSocket transport.
+- **HTTP:** `curl -X POST http://Rover.local:32231/api/cmd -d '{"command":"system"}'`
+- **WS:** `ws://Rover.local:32232/`, send a JSON frame, receive a JSON reply.
+- **MQTT:** publish to `rover/<id>/cmd`, subscribe to `rover/<id>/response` and `rover/<id>/telemetry`.
+- **BLE:** pair (static 6-digit PIN, configured in captive portal), write to the CMD characteristic, subscribe to STATE for replies.
 
 ---
 
-## API reference
+## Command reference
 
-All endpoints are served from the **control server on port 32231**. The camera MJPEG stream is on **port 80**.
+All four transports accept the **same JSON envelope**. Body shape: `{"command": "<name>", ...args}`. Reply: `{"response": <object>}` or `{"status": "<msg>"}`.
 
-| Method | Path             | Body                                   | Notes                                    |
-| ------ | ---------------- | -------------------------------------- | ---------------------------------------- |
-| GET    | `/`              | —                                      | Returns the control HTML page            |
-| GET    | `/status`        | —                                      | Combined motor + ultrasonic + system     |
-| GET    | `/motor`         | —                                      | Motor state                              |
-| PUT    | `/motor`         | `{"action":<int>,"motor":<int>}`       | action: 0=fwd, 1=back, 2=stop. motor: 0=L, 1=R, 2=both |
-| PUT    | `/motorPWM`      | `{"motor":<int>,"pwm":"<int>"}`        | PWM 0-255 (string)                       |
-| GET    | `/ultrasonic`    | —                                      | Last distance reading (cm)               |
-| PUT    | `/camera`        | `{"frame_size":<int>}`                 | 0–13, see HTML dropdown for sizes        |
-| GET    | `/system`        | —                                      | Uptime + free heap                       |
-| GET    | `/config`        | —                                      | Pin assignments                          |
-| GET    | `/wifi`          | —                                      | SSID + IP (no password leaked)           |
-| POST   | `/wifi/forget`   | —                                      | Wipes saved Wi-Fi creds and reboots      |
-| POST   | `/reboot`        | —                                      | Reboots the rover                        |
+| Command          | Args                                                | Reply / Effect                                |
+| ---------------- | --------------------------------------------------- | --------------------------------------------- |
+| `system`         | —                                                   | uptime, free heap                             |
+| `status`         | —                                                   | motor state + system                          |
+| `config`         | —                                                   | pin assignments                               |
+| `wifi`           | —                                                   | SSID + IP (no password)                       |
+| `forget_wi_fi`   | —                                                   | wipes Wi-Fi creds, reboots                    |
+| `distance`       | —                                                   | last distance reading (cm)                    |
+| `motor_state`    | —                                                   | current motor action + PWM per side           |
+| `set_motor`      | `action` (0=fwd,1=back,2=stop), `motor` (0=L,1=R,2=both) | drives, replies with motor state         |
+| `set_motor_pwm`  | `motor` (0/1/2), `pwm` (0-255 int)                  | applies PWM, replies with motor state         |
+| `set_camera`     | `frame_size` (0-13)                                 | switches MJPEG resolution                     |
+| `reboot`         | —                                                   | replies, then restarts                        |
 
-WebSocket (`ws://Rover.local:32232`) accepts the same operations as JSON commands; see `RoverWebSocketServer.cpp` for the protocol.
+**MQTT extras:** when MQTT is enabled, the rover also auto-publishes a combined telemetry frame to `rover/<id>/telemetry` every 2 s (no command needed) and a retained `online`/`offline` LWT on `rover/<id>/status`.
+
+**HTTP extras:** beyond `/api/cmd`, the firmware HTTP server hosts utility pages:
+- `GET /ota` + `POST /ota/upload` — over-the-air firmware update
+- `GET /logs` + `GET /logs/data` — live log viewer
+
+The MJPEG camera stream is on **port 81**.
 
 ---
 
@@ -179,7 +181,7 @@ void loop()  { roverApp.loop(); }
 | Field                       | Default      | Notes                                              |
 | --------------------------- | ------------ | -------------------------------------------------- |
 | `apSsid` / `apPassword`     | `Rover` / `123456789` | Setup-mode AP                             |
-| `webServerPort`             | `32231`      | Control panel + REST                               |
+| `webServerPort`             | `32231`      | HTTP `/api/cmd` + OTA + logs pages                 |
 | `webSocketPort`             | `32232`      | WebSocket                                          |
 | `mdnsDiscoveryName`         | `Rover`      | Resolves as `<name>.local`                         |
 | `serialBaud`                | `115200`     | Match your serial monitor                          |
@@ -235,18 +237,21 @@ Esp32Car/
 │   └── main.cpp                    # 12 lines — instantiates RoverApplication
 ├── lib/RoverApplication/src/       # All application logic lives here as a library
 │   ├── RoverApplication.{h,cpp}    # Wires everything together
-│   ├── Config/                     # Compile-time configuration struct
-│   ├── Camera/                     # OV2640 init, esp32-camera wrapper
+│   ├── Config/                     # Compile-time + runtime config (MQTT/BLE settings)
+│   ├── Command/                    # CommandDispatcher — shared JSON command surface
+│   ├── Camera/                     # OV2640 init, esp32-camera wrapper (port 81 stream)
 │   ├── Control/                    # MotorControl + MotorManager
 │   ├── Controller/                 # RoverController — central state, mutex-guarded
 │   ├── Fs/                         # AbstractFS + SPIFFS impl
-│   ├── Html/                       # control_html.h (PROGMEM string)
-│   ├── Manager/                    # UltrasonicManager (interrupt-driven)
+│   ├── Manager/                    # DistanceManager (Sharp GP2Y0A21 IR)
 │   ├── Monitor/                    # SystemMonitor — uptime, free heap
 │   ├── PostSetupBroadcaster/       # mDNS service broadcaster
-│   ├── RoverWebServer/             # REST control on port 32231
-│   ├── RoverWebSocket/             # WebSocket on port 32232
+│   ├── RoverWebServer/             # HTTP /api/cmd + OTA + logs (port 32231)
+│   ├── RoverWebSocket/             # WebSocket transport (port 32232)
+│   ├── Mqtt/                       # MQTT bridge (opt-in, ROVER_FEATURE_MQTT)
+│   ├── Ble/                        # NimBLE GATT peripheral (opt-in, ROVER_FEATURE_BLE)
 │   └── WiFi/                       # Setup manager + captive portal HTML + persisted config
+├── web/                            # Standalone browser app — the rover's UI
 └── data/                           # Empty; reserved for future SPIFFS-served assets
 ```
 
@@ -281,8 +286,8 @@ The rover supports two OTA paths after the **first** serial flash with the new p
 
 ### Web OTA (end-user friendly)
 
-1. Open `http://Rover.local:32231/ota` (or the gear icon → **Update Firmware (OTA)** button in the control panel).
-2. Pick a `firmware.bin` (e.g. `.pio/build/esp32cam/firmware.bin`).
+1. Open `http://Rover.local:32231/ota`.
+2. Pick a `firmware.bin` (e.g. `.pio/build/wrover-cam/firmware.bin`).
 3. Click **Upload & Flash**. Progress bar shows the transfer; the rover reboots into the new firmware on completion.
 
 If `adminPassword` is set in your config, the upload page is gated by HTTP basic auth.

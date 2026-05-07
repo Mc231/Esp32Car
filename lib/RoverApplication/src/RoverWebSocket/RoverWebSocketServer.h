@@ -2,40 +2,22 @@
 #define ROVERWEBSOCKETSERVER_H
 
 #include <Arduino.h>
-#include "Controller/RoverController.h"
-#include "esp_camera.h"
+#include "Command/CommandDispatcher.h"
 #include "Config/RoverApplicationConfig.h"
-#include "Monitor/SystemMonitor.h"
 #include <WebSocketsServer.h>
-#include <nlohmann/json.hpp>
-
-using json = nlohmann::json;
 
 class RoverWebSocketServer {
 public:
-  RoverWebSocketServer(RoverController& carController, RoverApplicationConfig& config, SystemMonitor& systemMonitor);
+  RoverWebSocketServer(CommandDispatcher& dispatcher, const RoverApplicationConfig& config);
   void begin();
   void loop();
+  // Push an unsolicited message to all connected clients (used by other
+  // transports that want to mirror state into the WS surface, if needed).
+  void broadcast(const std::string& payload);
 private:
   WebSocketsServer wsServer;
-  RoverController &carController;
-  RoverApplicationConfig config;
-  SystemMonitor &systemMonitor;
+  CommandDispatcher& dispatcher;
   void handleWebSocketMessage(uint8_t num, WStype_t type, uint8_t *payload, size_t length);
-  json asJSON(const std::map<std::string, std::any>& map) const;
-  void sendData(const std::map<std::string, std::any>& dataMap);
-  void handleSystem();
-  void handleStatus();
-  void handleConfig();
-  void handleReboot();
-  void handleGetWiFi();
-  void handleWiFiForget();
-  void handleGetDistance();
-  void handleCamera(const nlohmann::json& j);
-  void handleSetMotorPWM(const nlohmann::json& j);
-  void handleMotorState();
-  void handleSetMotor(const nlohmann::json& j); 
-
 };
 
 #endif // ROVERWEBSOCKETSERVER_H
