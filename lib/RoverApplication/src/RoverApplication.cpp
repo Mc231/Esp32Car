@@ -101,6 +101,12 @@ void RoverApplication::registerTransports() {
   transports.add(&webSocketServer);
   transports.add(&serialTransport);
   transports.add(&espNowTransport);
+  // Telnet (port 23) is the global Log server — already started in
+  // setupCompleted via Log.begin(). Wire the dispatcher so the read
+  // path turns into command dispatch, then register it so set_transport
+  // can toggle it like any other.
+  Log.setDispatcher(&commandDispatcher);
+  transports.add(&Log);
 
 #ifdef ROVER_FEATURE_MQTT
   RoverMqttClient::Config mc;

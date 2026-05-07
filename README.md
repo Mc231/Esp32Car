@@ -1,6 +1,6 @@
 # ESP32-CAM Rover
 
-A Wi-Fi controlled rover built on the AI-Thinker ESP32-CAM (and ESP32-WROVER variant). Streams video, drives differential-drive motors via an L298N (or compatible) driver, and exposes a unified JSON command surface across **HTTP, WebSocket, MQTT, ESP-NOW, and Serial** transports. UI lives in the standalone `web/` app.
+A Wi-Fi controlled rover built on the AI-Thinker ESP32-CAM (and ESP32-WROVER variant). Streams video, drives differential-drive motors via an L298N (or compatible) driver, and exposes a unified JSON command surface across **HTTP, WebSocket, Telnet, Serial, ESP-NOW, and MQTT** transports. UI lives in the standalone `web/` app.
 
 ---
 
@@ -9,12 +9,13 @@ A Wi-Fi controlled rover built on the AI-Thinker ESP32-CAM (and ESP32-WROVER var
 - **First-run captive portal** — connect to the rover's `Rover` Wi-Fi AP, pick your home network. Rover persists Wi-Fi creds and reboots into station mode. MQTT broker config lives in the build-time `RoverApplicationConfig` (see `src/main.cpp`).
 - **Standalone web UI** at `web/` — camera stream, on-screen D-pad, keyboard arrow keys, speed slider, live telemetry overlays, multi-rover picker, recording + reverse-replay, autonomous obstacle-avoidance. Pure browser, no build step.
 - **Camera streaming** — MJPEG from the OV2640 on its own server (port 81).
-- **Unified JSON command surface** across five transports — same envelope (`{"command":"…"}`), same handlers, different pipes:
+- **Unified JSON command surface** across six transports — same envelope (`{"command":"…"}`), same handlers, different pipes:
   - **HTTP** `POST /api/cmd` on port 32231
   - **WebSocket** on port 32232 (used by the standalone web app)
-  - **MQTT** publish/subscribe on `rover/<id>/cmd|response|telemetry|status` (opt-in env, configurable broker)
+  - **Telnet** on port 23 — same connection serves live logs and accepts JSON commands; replies prefixed with `>>> `
   - **Serial** — JSON-per-line over USB UART, replies prefixed with `>>> `
   - **ESP-NOW** — peer-to-peer 2.4 GHz broadcast (no router needed); ~200 m line-of-sight; 4-byte magic prefix `RVC0` + JSON, 246 B max payload
+  - **MQTT** publish/subscribe on `rover/<id>/cmd|response|telemetry|status` (opt-in env, configurable broker)
 - **mDNS discovery** — reachable at `Rover.local`, advertises camera/control/WS services for zeroconf browsers.
 - **HTTP basic auth** support (off by default) on the control HTTP server.
 
@@ -132,6 +133,7 @@ There is no firmware-served HTML — point any of the transports at the rover.
 - **WS:** `ws://Rover.local:32232/` — send a JSON frame, receive a JSON reply.
 - **MQTT:** publish to `rover/<id>/cmd`, subscribe to `rover/<id>/response` and `rover/<id>/telemetry`.
 - **Serial:** `pio device monitor`, type `{"command":"system"}` and press Enter. Reply lines are prefixed with `>>> ` so they're easy to grep out of log output.
+- **Telnet:** `nc Rover.local 23` — see live logs streaming, type a JSON command + Enter, reply lines come back prefixed with `>>> `. Same connection, both directions.
 - **ESP-NOW:** another ESP32 on the same Wi-Fi channel sends `[4-byte 'RVC0'][JSON]` to the broadcast MAC. Replies arrive as broadcast frames. Useful for a phone-free joystick remote or rover-to-rover coordination — no router, no IP.
 
 ---
@@ -154,7 +156,7 @@ All four transports accept the **same JSON envelope**. Body shape: `{"command": 
 | `set_camera`     | `frame_size` (0-13)                                 | switches MJPEG resolution                     |
 | `reboot`         | —                                                   | replies, then restarts                        |
 | `transports`     | —                                                   | list of registered transports + running state |
-| `set_transport`  | `name` ("http"/"ws"/"serial"/"espnow"/"mqtt"), `enabled` (bool) | start/stop a transport at runtime. In-memory only — boot defaults come from `RoverApplicationConfig`. |
+| `set_transport`  | `name` ("http"/"ws"/"telnet"/"serial"/"espnow"/"mqtt"), `enabled` (bool) | start/stop a transport at runtime. In-memory only — boot defaults come from `RoverApplicationConfig`. |
 
 **MQTT extras:** when MQTT is enabled, the rover also auto-publishes a combined telemetry frame to `rover/<id>/telemetry` every 2 s (no command needed) and a retained `online`/`offline` LWT on `rover/<id>/status`.
 

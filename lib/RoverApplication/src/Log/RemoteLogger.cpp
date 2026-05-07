@@ -1,4 +1,5 @@
 #include "RemoteLogger.h"
+#include "Command/CommandDispatcher.h"
 #include <esp_log.h>
 #include <stdarg.h>
 
@@ -17,16 +18,28 @@ static int espLogToRemote(const char* fmt, va_list args) {
 
 void RemoteLogger::begin() {
   if (started) return;
-  ring = (uint8_t*)malloc(bufferSize);
   if (!ring) {
-    Serial.println("RemoteLogger: malloc failed, telnet log disabled");
-    return;
+    ring = (uint8_t*)malloc(bufferSize);
+    if (!ring) {
+      Serial.println("RemoteLogger: malloc failed, telnet log disabled");
+      return;
+    }
   }
   server.begin();
   server.setNoDelay(true);
   started = true;
   esp_log_set_vprintf(&espLogToRemote);
-  Serial.printf("RemoteLogger: telnet log on port %u (use: nc <ip> %u)\n", port, port);
+  Serial.printf("RemoteLogger: telnet on port %u (use: nc <ip> %u)\n", port, port);
+}
+
+void RemoteLogger::stop() {
+  if (!started) return;
+  for (auto& c : clients) {
+    if (c.sock.connected()) c.sock.stop();
+  }
+  clients.clear();
+  server.end();
+  started = false;
 }
 
 void RemoteLogger::loop() {
@@ -36,23 +49,57 @@ void RemoteLogger::loop() {
   if (server.hasClient()) {
     WiFiClient newClient = server.accept();
     if (clients.size() >= maxClients) {
-      newClient.println("Sorry, too many log clients. Disconnect another and retry.");
+      newClient.println("Sorry, too many telnet clients. Disconnect another and retry.");
       newClient.stop();
     } else {
       newClient.setNoDelay(true);
       sendRingTo(newClient);
       newClient.println("--- live log ---");
-      clients.push_back(newClient);
+      if (dispatcher) {
+        newClient.println("(type a JSON command + Enter to control the rover; replies prefixed with '>>> ')");
+      }
+      clients.push_back(Client{ std::move(newClient), String() });
     }
   }
 
-  // Drop disconnected clients
+  // Drop disconnected clients + read pending input from the rest.
   for (auto it = clients.begin(); it != clients.end(); ) {
-    if (!it->connected()) {
-      it->stop();
+    if (!it->sock.connected()) {
+      it->sock.stop();
       it = clients.erase(it);
     } else {
+      handleClientInput(*it);
       ++it;
+    }
+  }
+}
+
+void RemoteLogger::handleClientInput(Client& c) {
+  while (c.sock.available()) {
+    char ch = (char)c.sock.read();
+    if (ch == '\n' || ch == '\r') {
+      if (c.inputBuf.length() > 0) {
+        // Only treat lines that look like JSON as commands; ignore stray
+        // input or the user pressing Enter on a blank line.
+        if (c.inputBuf[0] == '{' && dispatcher) {
+          std::string raw(c.inputBuf.c_str());
+          dispatcher->dispatchRaw(raw, [this](const std::string& reply) {
+            // Broadcast reply to all telnet clients, matching the WS
+            // pattern (every connected client sees every reply). Prefix
+            // mirrors the Serial transport so host-side parsers can
+            // grep replies out of interleaved log output.
+            std::string line = ">>> " + reply + "\r\n";
+            broadcast((const uint8_t*)line.data(), line.size());
+          });
+        }
+        c.inputBuf = "";
+      }
+    } else {
+      c.inputBuf += ch;
+      if (c.inputBuf.length() > 1024) {
+        c.sock.println("Input line too long, discarded.");
+        c.inputBuf = "";
+      }
     }
   }
 }
@@ -83,14 +130,12 @@ void RemoteLogger::appendToRing(uint8_t c) {
 
 String RemoteLogger::readSince(size_t cursor) const {
   if (!ring) return String();
-  // How many fresh bytes since the caller's cursor?
   size_t available = totalBytes - cursor;
   if (available == 0) return String();
   if (available > bufferSize) available = bufferSize;   // we lost some — give what we have
 
   String out;
   out.reserve(available + 1);
-  // Walk back `available` bytes from the head (which points to the next slot to write).
   size_t start = (ringHead + bufferSize - available) % bufferSize;
   for (size_t i = 0; i < available; ++i) {
     out += (char)ring[(start + i) % bufferSize];
@@ -110,6 +155,6 @@ void RemoteLogger::sendRingTo(WiFiClient& client) {
 
 void RemoteLogger::broadcast(const uint8_t* data, size_t len) {
   for (auto& c : clients) {
-    if (c.connected()) c.write(data, len);
+    if (c.sock.connected()) c.sock.write(data, len);
   }
 }
