@@ -226,6 +226,13 @@ header.bar {
   box-shadow: 0 0 14px var(--accent-glow);
 }
 
+.icon-btn.auto.active {
+  color: var(--success);
+  border-color: var(--success);
+  box-shadow: 0 0 14px var(--success-glow);
+}
+.icon-btn.auto.active svg { animation: pulse 1.4s ease-in-out infinite; }
+
 .rec-badge {
   position: absolute;
   top: -6px;

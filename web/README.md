@@ -37,6 +37,7 @@ web/
     ├── toast.js            # tiny toast helper
     ├── ws.js               # WebSocket transport (queue, reconnect, probe)
     ├── recording.js        # record + reverse-replay engine
+    ├── autonomous.js       # obstacle-avoidance state machine
     ├── controls-input.js   # d-pad / keyboard event bindings
     ├── picker.js           # picker page entry
     └── control.js          # control page entry — wires everything together
@@ -135,6 +136,35 @@ How to use:
 
 During replay the page pumps a keepalive command every 700 ms so the
 rover's 1500 ms motor-deadman doesn't stop us mid-move.
+
+### Autonomous mode (obstacle avoidance)
+
+Tap the lightning-bolt icon next to the reboot button to start. The page
+takes over the WS (telemetry polling pauses) and runs a state machine
+that drives forward and dynamically scales PWM with the free distance
+ahead — close to `STOP_CM` (~22 cm) it uses `PWM_MIN` (180), at/over
+`FAR_CM` (~70 cm) it uses `PWM_MAX` (255), linear in between.
+
+When an obstacle comes inside `STOP_CM` the rover stops, then pivots in
+short bursts (180 ms) re-reading the GP2Y0A21 between each burst until
+clearance (`CLEAR_CM` ≈ 45 cm) is found. The initial pivot side
+**alternates each encounter** so it can't lock into spinning the same
+way. If a single side fails to clear within 3 s, it backs up briefly,
+flips to the other side, and tries again. All pivoting uses a fixed
+`PIVOT_PWM` (180) for predictable angular increments.
+
+Stopping conditions:
+
+- Tap the auto button again, or any d-pad button, or press an arrow key.
+- Disconnect / WS close.
+- 5-minute hard cap (`HARD_CAP_MS`) — battery + walked-away safety.
+
+When auto exits the user's pre-auto slider PWM is restored to the rover
+so the next manual move uses the speed the user had selected.
+
+Tunables live at the top of `js/autonomous.js`:
+`STOP_CM`, `CLEAR_CM`, `FAR_CM`, `PWM_MIN`, `PWM_MAX`, `PIVOT_PWM`,
+`PIVOT_BURST_MS`, `MAX_PIVOT_MS`, `BACKUP_MS`, `HARD_CAP_MS`, `TICK_MS`.
 
 ### Camera stream
 

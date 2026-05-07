@@ -4,6 +4,7 @@
 import { createConnection } from './ws.js';
 import { toast } from './toast.js';
 import { createRecorder } from './recording.js';
+import { createAutonomous } from './autonomous.js';
 import { bindControls } from './controls-input.js';
 
 const $ = id => document.getElementById(id);
@@ -116,6 +117,7 @@ async function pollOnce() {
 
 function startPolling() {
   stopPolling();
+  if (auto?.isActive()) return;   // autonomous loop owns the WS while active
   pollOnce();
   state.pollTimer = setInterval(pollOnce, 1000);
 }
@@ -210,10 +212,67 @@ $('replayBtn').addEventListener('click', async () => {
   if (completed) toast('Replay finished', 'success');
 });
 
+// ---------- Autonomous mode ----------
+let userSpeedBeforeAuto = state.speed;
+const auto = createAutonomous({
+  send,
+  dispatch,
+  motor,
+  applyPwm: pwm => applySpeed(pwm, 2),
+  onTelemetry: ({ distance, pwm }) => {
+    if (distance != null) {
+      const cm = parseFloat(distance).toFixed(1);
+      $('telDist').textContent = `${cm} cm`;
+      $('distStat').innerHTML  = `<b>${cm}</b> cm`;
+    }
+    // Reflect auto's PWM in the overlay/slider but DON'T touch state.speed —
+    // we want to restore the user's slider value when auto exits.
+    if (pwm != null) {
+      $('speed').value = pwm;
+      $('speedVal').textContent = pwm;
+      $('speedStat').innerHTML = `PWM <b>${pwm}</b>`;
+    }
+  },
+  onStateChange: s => {
+    const btn = $('autoBtn');
+    btn.classList.toggle('active', s.active);
+    btn.title = s.active ? `Autonomous: ${s.phase}` : 'Autonomous mode';
+    if (s.active) {
+      userSpeedBeforeAuto = state.speed;
+      stopPolling();          // suspend 1Hz telemetry while auto owns the WS
+    } else {
+      // Push the user's pre-auto PWM back so the next manual move uses it.
+      applySpeed(userSpeedBeforeAuto, 2);
+      $('speed').value = userSpeedBeforeAuto;
+      $('speedVal').textContent = userSpeedBeforeAuto;
+      $('speedStat').innerHTML = `PWM <b>${userSpeedBeforeAuto}</b>`;
+      if (state.online) startPolling();
+    }
+  },
+});
+
+$('autoBtn').addEventListener('click', () => {
+  if (!state.online) { toast('Rover offline'); return; }
+  if (auto.isActive()) {
+    auto.stop();
+    toast('Autonomous stopped');
+  } else {
+    auto.start();
+    toast('Autonomous started — drive in 5 min cap', 'success');
+  }
+});
+
 // ---------- Input bindings ----------
 bindControls({
   dispatchFn: dispatch,
-  onPress: act   => recorder.onPress(act),
+  onPress: act => {
+    // Any manual d-pad press cancels autonomous mode.
+    if (auto.isActive()) {
+      auto.stop();
+      toast('Autonomous cancelled');
+    }
+    recorder.onPress(act);
+  },
   onRelease: act => recorder.onRelease(act),
 });
 
