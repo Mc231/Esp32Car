@@ -21,9 +21,6 @@
 #include "Ota/OTAManager.h"
 #include "Log/RemoteLogger.h"
 
-#ifdef ROVER_FEATURE_BLE
-#include "Ble/RoverBLEServer.h"
-#endif
 #ifdef ROVER_FEATURE_MQTT
 #include "Mqtt/RoverMqttClient.h"
 #endif
@@ -58,9 +55,6 @@ private:
   PostSetupAvailabilityBroadcaster* postSetupBroadcaster;
   OTAManager otaManager;
 
-#ifdef ROVER_FEATURE_BLE
-  RoverBLEServer* bleServer = nullptr;
-#endif
 #ifdef ROVER_FEATURE_MQTT
   RoverMqttClient* mqttClient = nullptr;
 #endif

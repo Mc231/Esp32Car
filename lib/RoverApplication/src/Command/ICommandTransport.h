@@ -2,7 +2,7 @@
 #define ICOMMANDTRANSPORT_H
 
 // Common interface for any transport that carries the unified JSON
-// command surface (HTTP, WebSocket, BLE, MQTT, …).
+// command surface (HTTP, WebSocket, MQTT, …).
 //
 // Lifecycle:
 //   begin() is called when the transport should start serving requests
@@ -23,7 +23,7 @@ public:
   virtual ~ICommandTransport() = default;
 
   // A short identifier used in logs and the `set_transport` command.
-  // Stable, lowercase, no spaces (e.g. "http", "ws", "ble", "mqtt").
+  // Stable, lowercase, no spaces (e.g. "http", "ws", "mqtt").
   virtual const char* name() const = 0;
 
   // Start the transport. Idempotent — calling begin() while already

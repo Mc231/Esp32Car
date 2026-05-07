@@ -379,22 +379,6 @@ const char captivePortalHTML[] PROGMEM = R"rawliteral(
           <input type="text" id="mqtt_topic_prefix" placeholder="rover" autocapitalize="off" autocorrect="off" spellcheck="false">
         </div>
       </div>
-
-      <div class="section-title">Bluetooth (BLE)</div>
-      <div class="toggle">
-        <span>Enable BLE control</span>
-        <input type="checkbox" id="ble_enabled">
-      </div>
-      <div class="row-2">
-        <div class="grp">
-          <label for="ble_pin">Pairing PIN (6 digits)</label>
-          <input type="text" id="ble_pin" placeholder="123456" inputmode="numeric" maxlength="6" pattern="[0-9]{6}">
-        </div>
-        <div class="grp">
-          <label for="ble_device_name">Device name</label>
-          <input type="text" id="ble_device_name" placeholder="Rover" autocapitalize="off" autocorrect="off" spellcheck="false">
-        </div>
-      </div>
     </div>
   </details>
 
@@ -499,11 +483,6 @@ const char captivePortalHTML[] PROGMEM = R"rawliteral(
           document.getElementById('mqtt_client_id').value    = d.mqtt.clientId || '';
           document.getElementById('mqtt_topic_prefix').value = d.mqtt.topicPrefix || '';
         }
-        if (d.ble) {
-          document.getElementById('ble_enabled').checked = !!d.ble.enabled;
-          document.getElementById('ble_pin').value       = d.ble.pin || '';
-          document.getElementById('ble_device_name').value = d.ble.deviceName || '';
-        }
       })
       .catch(() => {});
   }
@@ -519,9 +498,6 @@ const char captivePortalHTML[] PROGMEM = R"rawliteral(
       'mqtt_password=' + encodeURIComponent(val('mqtt_password')),
       'mqtt_client_id=' + encodeURIComponent(val('mqtt_client_id')),
       'mqtt_topic_prefix=' + encodeURIComponent(val('mqtt_topic_prefix')),
-      'ble_enabled=' + (checked('ble_enabled') ? '1' : '0'),
-      'ble_pin=' + encodeURIComponent(val('ble_pin')),
-      'ble_device_name=' + encodeURIComponent(val('ble_device_name')),
     ];
     return parts.join('&');
   }

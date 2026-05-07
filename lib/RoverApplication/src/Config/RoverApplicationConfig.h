@@ -19,7 +19,6 @@ struct RoverApplicationConfig {
     // Single GPIO drives HC-SR04 in single-pin mode (TRIG+ECHO joined externally
     // through a 1k resistor, line tapped via 1k/2k divider down to 3.3V).
     int distanceSensorPin;
-    bool distanceSensorEnabled;
     // HTTP basic auth for the control panel (port webServerPort).
     // Both empty = auth disabled.
     const char* adminUser;
@@ -53,10 +52,8 @@ struct RoverApplicationConfig {
           // sensor's analog output lands here directly (no resistors needed,
           // 3.1V max output fits within the ESP32 ADC range).
           distanceSensorPin(33),
-          distanceSensorEnabled(true),
 #else
           distanceSensorPin(16),
-          distanceSensorEnabled(false),
 #endif
           adminUser(""),
           adminPassword(""),

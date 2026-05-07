@@ -20,10 +20,6 @@ public:
     String mqttPassword;
     String mqttClientId;       // empty → derived from MAC at runtime
     String mqttTopicPrefix;    // empty → "rover"
-
-    bool   bleEnabled = false;
-    String blePin = "123456";  // 6-digit static passkey
-    String bleDeviceName;      // empty → derived from mdnsDiscoveryName
   };
 
   explicit RuntimeConfigManager(AbstractFS& fs);

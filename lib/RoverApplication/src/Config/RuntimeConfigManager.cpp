@@ -41,12 +41,6 @@ const RuntimeConfigManager::Config& RuntimeConfigManager::read() {
     if (m.contains("clientId"))    cached.mqttClientId = String(m["clientId"].get<std::string>().c_str());
     if (m.contains("topicPrefix")) cached.mqttTopicPrefix = String(m["topicPrefix"].get<std::string>().c_str());
   }
-  if (j.contains("ble")) {
-    auto& b = j["ble"];
-    if (b.contains("enabled"))    cached.bleEnabled = b["enabled"].get<bool>();
-    if (b.contains("pin"))        cached.blePin = String(b["pin"].get<std::string>().c_str());
-    if (b.contains("deviceName")) cached.bleDeviceName = String(b["deviceName"].get<std::string>().c_str());
-  }
   return cached;
 }
 
@@ -61,9 +55,6 @@ void RuntimeConfigManager::save(const Config& cfg) {
   j["mqtt"]["password"]    = std::string(cfg.mqttPassword.c_str());
   j["mqtt"]["clientId"]    = std::string(cfg.mqttClientId.c_str());
   j["mqtt"]["topicPrefix"] = std::string(cfg.mqttTopicPrefix.c_str());
-  j["ble"]["enabled"]      = cfg.bleEnabled;
-  j["ble"]["pin"]          = std::string(cfg.blePin.c_str());
-  j["ble"]["deviceName"]   = std::string(cfg.bleDeviceName.c_str());
   std::string body = j.dump();
 
   File f = fileSystem.open(CONFIG_FILE, "w");

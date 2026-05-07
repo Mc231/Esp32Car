@@ -105,10 +105,6 @@ void WiFiSetupManager::handleGetAdvanced() {
     json += ",\"password\":\"\"";
     json += ",\"clientId\":\""; json += cfg.mqttClientId; json += "\"";
     json += ",\"topicPrefix\":\""; json += cfg.mqttTopicPrefix; json += "\"";
-    json += "},\"ble\":{";
-    json += "\"enabled\":";   json += (cfg.bleEnabled ? "true" : "false");
-    json += ",\"pin\":\"";    json += cfg.blePin; json += "\"";
-    json += ",\"deviceName\":\""; json += cfg.bleDeviceName; json += "\"";
     json += "}}";
     webServer.send(200, "application/json", json);
 }
@@ -136,10 +132,6 @@ void WiFiSetupManager::saveAdvancedFromForm() {
     }
     if (webServer.hasArg("mqtt_client_id"))    { cfg.mqttClientId    = strArg("mqtt_client_id"); changed = true; }
     if (webServer.hasArg("mqtt_topic_prefix")) { cfg.mqttTopicPrefix = strArg("mqtt_topic_prefix"); changed = true; }
-
-    if (webServer.hasArg("ble_enabled"))     { cfg.bleEnabled = boolArg("ble_enabled"); changed = true; }
-    if (webServer.hasArg("ble_pin"))         { cfg.blePin     = strArg("ble_pin"); changed = true; }
-    if (webServer.hasArg("ble_device_name")) { cfg.bleDeviceName = strArg("ble_device_name"); changed = true; }
 
     if (changed) {
         runtimeConfig.save(cfg);

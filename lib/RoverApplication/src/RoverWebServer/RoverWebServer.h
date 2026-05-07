@@ -3,18 +3,36 @@
 
 #include <Arduino.h>
 #include <WebServer.h>
+#include "Controller/RoverController.h"
+#ifndef ROVER_NO_CAMERA
+#include "esp_camera.h"
+#endif
 #include "Config/RoverApplicationConfig.h"
+#include "Monitor/SystemMonitor.h"
 #include "Command/CommandDispatcher.h"
 #include "Command/ICommandTransport.h"
+#include <nlohmann/json.hpp>
 
-// HTTP transport — exposes the unified JSON command surface plus the
-// firmware utility pages (OTA upload, log viewer). The legacy per-route
-// REST handlers (/motor, /system, …) and the firmware-served control
-// HTML page were removed; the standalone `web/` app is the UI now and
-// new clients should POST `/api/cmd`.
+using json = nlohmann::json;
+
+// HTTP transport. Hosts:
+//   - the firmware-served control HTML page at GET /
+//   - the legacy per-route REST API the page uses (/motor, /motorPWM,
+//     /system, /status, /distance, /wifi, /reboot, …) — kept so the
+//     firmware UI works standalone, no external web app needed
+//   - the unified `POST /api/cmd` JSON command surface that BLE/WS/MQTT
+//     also expose, for clients that don't want one route per command
+//   - utility pages `/ota` (firmware upload) and `/logs` (live viewer)
+//
+// Implements ICommandTransport so the registry can lifecycle it
+// uniformly. HTTP is "always-on" by convention but the interface lets
+// future callers stop/start it via the `set_transport` command.
 class RoverWebServer : public ICommandTransport {
 public:
-  RoverWebServer(const RoverApplicationConfig& config, CommandDispatcher& dispatcher);
+  RoverWebServer(RoverController& carController,
+                 const RoverApplicationConfig& config,
+                 SystemMonitor& systemMonitor,
+                 CommandDispatcher& dispatcher);
 
   // ICommandTransport
   const char* name() const override { return "http"; }
@@ -25,20 +43,42 @@ public:
 
   void handleClient();
 
+  // Legacy REST handlers (used by the firmware-served HTML control page).
+  void handleReboot();
+  void handleGetWiFi();
+  void handleWiFiForget();
+  void handleSetMotor();
+  void handleSetMotorPWM();
+  void handleMotorState();
+  void handleGetDistance();
+  void handleCamera();
+  void handleRoot();
+  void handleSystem();
+  void handleStatus();
+  void handleConfig();
+
+  // Unified JSON command surface (POST /api/cmd).
+  void handleApiCommand();
+
+  // Utility pages.
+  void handleOtaPage();
+  void handleOtaUpload();
+  void handleOtaUploadFinish();
+  void handleLogsPage();
+  void handleLogsData();
+
 private:
+  RoverController& carController;
   RoverApplicationConfig config;
+  SystemMonitor& systemMonitor;
   CommandDispatcher& dispatcher;
   WebServer server;
   bool running = false;
 
-  void handleApiCommand();      // POST /api/cmd  — JSON in, JSON out
-  void handleOtaPage();         // GET  /ota
-  void handleOtaUpload();       // POST /ota/upload (multipart)
-  void handleOtaUploadFinish();
-  void handleLogsPage();        // GET  /logs
-  void handleLogsData();        // GET  /logs/data?since=N
-
-  bool authorized();            // 401 + return false when admin auth fails
+  json asJSON(const std::map<std::string, std::any>& map) const;
+  void sendData(const std::map<std::string, std::any>& dataMap,
+                const String& responseType = "application/json");
+  bool authorized();   // 401 + return false on failed admin auth
 };
 
 #endif // ROVERWEBSERVER_H

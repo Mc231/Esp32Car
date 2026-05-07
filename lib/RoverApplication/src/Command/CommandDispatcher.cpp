@@ -144,15 +144,15 @@ void CommandDispatcher::handleSetTransport(const json& j, const ReplyFn& respond
   }
   if (enabled) t->begin(); else t->stop();
 
-  // Persist toggle state for MQTT/BLE so it survives reboot. HTTP/WS
-  // are always-on at boot regardless of last toggle, since they are
-  // the bootstrap channels.
+  // Persist toggle state for MQTT so it survives reboot. HTTP/WS are
+  // always-on at boot regardless of last toggle (they're the bootstrap
+  // channels).
   if (runtimeConfigMgr) {
     auto cfg = runtimeConfigMgr->read();
-    bool dirty = false;
-    if (n == "mqtt") { cfg.mqttEnabled = enabled; dirty = true; }
-    else if (n == "ble") { cfg.bleEnabled = enabled; dirty = true; }
-    if (dirty) runtimeConfigMgr->save(cfg);
+    if (n == "mqtt") {
+      cfg.mqttEnabled = enabled;
+      runtimeConfigMgr->save(cfg);
+    }
   }
 
   // Reply with the new state.
@@ -168,7 +168,9 @@ std::string CommandDispatcher::buildTelemetry() {
   std::map<std::string, std::any> result;
   result["system"]   = systemMonitor.getState();
   result["motor"]    = controller.getMotorState();
+#ifdef ROVER_FEATURE_DISTANCE
   result["distance"] = controller.getDistanceState();
+#endif
   std::map<std::string, std::any> envelope = {{"telemetry", result}};
   return serialize(envelope);
 }
@@ -195,7 +197,11 @@ void CommandDispatcher::handleConfig(const ReplyFn& respond) {
   result["rightMotorPin2"]           = config.rightMotorPin2;
   result["rightMotorPwm"]            = config.rightMotorPwm;
   result["distanceSensorPin"]        = config.distanceSensorPin;
-  result["distance_sensor_enabled"]  = config.distanceSensorEnabled;
+#ifdef ROVER_FEATURE_DISTANCE
+  result["distance_sensor_enabled"]  = true;
+#else
+  result["distance_sensor_enabled"]  = false;
+#endif
   std::map<std::string, std::any> dataMap = {{"response", result}};
   respond(serialize(dataMap));
 }
@@ -220,8 +226,12 @@ void CommandDispatcher::handleWiFiForget(const ReplyFn& respond) {
 }
 
 void CommandDispatcher::handleGetDistance(const ReplyFn& respond) {
+#ifdef ROVER_FEATURE_DISTANCE
   std::map<std::string, std::any> dataMap = {{"response", controller.getDistanceState()}};
   respond(serialize(dataMap));
+#else
+  respond("{\"status\":\"distance sensor not built into this firmware\"}");
+#endif
 }
 
 void CommandDispatcher::handleCamera(const json& j, const ReplyFn& respond) {
