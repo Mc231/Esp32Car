@@ -25,6 +25,18 @@ struct RoverApplicationConfig {
     // 0 = disabled. Default: 1500 ms.
     unsigned long deadmanTimeoutMs;
 
+    // Per-transport "start at boot" toggles. Every transport is always
+    // REGISTERED (so it shows up in `transports` and can be flipped on
+    // via `set_transport`); these flags only decide which begin() at
+    // boot. Defaults: HTTP + WS only — minimises radio/CPU draw on
+    // battery. Toggle the others on at runtime via the web UI when
+    // needed.
+    bool httpEnabledAtBoot;
+    bool webSocketEnabledAtBoot;
+    bool serialTransportEnabledAtBoot;
+    bool espNowEnabledAtBoot;
+    bool telnetEnabledAtBoot;
+
     // MQTT bridge settings — only consulted when the firmware is built
     // with -DROVER_FEATURE_MQTT. host empty → MQTT stays off even if
     // mqttEnabled is true. Override per-rover from main.cpp.
@@ -66,6 +78,11 @@ struct RoverApplicationConfig {
           adminUser(""),
           adminPassword(""),
           deadmanTimeoutMs(1500),
+          httpEnabledAtBoot(true),
+          webSocketEnabledAtBoot(true),
+          serialTransportEnabledAtBoot(false),
+          espNowEnabledAtBoot(false),
+          telnetEnabledAtBoot(false),
           mqttEnabled(false),
           mqttHost(""),
           mqttPort(1883),

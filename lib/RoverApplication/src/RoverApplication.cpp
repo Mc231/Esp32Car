@@ -67,6 +67,9 @@ void RoverApplication::setupCompleted() {
   // ("Camera capture failed") during MJPEG streaming. Trade: a bit more
   // current, but required for stable streaming.
   WiFi.setSleep(false);
+  // Bring Log up briefly so the boot banner reaches any client that
+  // happens to be watching telnet — but it'll be stopped below if the
+  // boot config says telnet is off, leaving Serial as the only sink.
   Log.begin();
   Log.printf("Wi-Fi connected. IP: %s  mDNS: %s.local\n",
              WiFi.localIP().toString().c_str(),
@@ -80,7 +83,9 @@ void RoverApplication::setupCompleted() {
              this->config.mdnsDiscoveryName, this->config.webServerPort);
   Log.printf("Logs:   http://%s.local:%d/logs\n",
              this->config.mdnsDiscoveryName, this->config.webServerPort);
-  Log.printf("Telnet: nc %s 23\n", WiFi.localIP().toString().c_str());
+  Log.printf("Telnet: nc %s 23%s\n",
+             WiFi.localIP().toString().c_str(),
+             config.telnetEnabledAtBoot ? "" : "  (off at boot — toggle via set_transport)");
   postSetupBroadcaster->begin();
   isSetupComplete = true;
 
@@ -124,12 +129,29 @@ void RoverApplication::registerTransports() {
   // `set_transport` commands can find + toggle transports.
   commandDispatcher.setTransportRegistry(&transports);
 
-  // Start always-on transports unconditionally; MQTT only if enabled in
-  // the build-time config and the host string is non-empty.
-  webServer.begin();
-  webSocketServer.begin();
-  serialTransport.begin();
-  espNowTransport.begin();
+  // Start each transport only if its boot flag is set in the config.
+  // Defaults: HTTP + WS only — keeps idle current low on battery.
+  // The remaining transports are still REGISTERED above, so the user
+  // can flip them on at runtime via the `set_transport` command (or
+  // the web UI's transports panel).
+  if (config.httpEnabledAtBoot)      webServer.begin();
+  else                                Log.println("[http] off at boot (config)");
+  if (config.webSocketEnabledAtBoot) webSocketServer.begin();
+  else                                Log.println("[ws] off at boot (config)");
+  if (config.serialTransportEnabledAtBoot) serialTransport.begin();
+  else                                      Log.println("[serial] off at boot (config)");
+  if (config.espNowEnabledAtBoot)    espNowTransport.begin();
+  else                                Log.println("[espnow] off at boot (config)");
+
+  // Telnet is special — Log.begin() above started its TCP server so the
+  // boot banner could reach any connected client. If the boot config
+  // says telnet is off, stop that TCP listener now. Serial output keeps
+  // working either way (RemoteLogger writes Serial unconditionally).
+  if (!config.telnetEnabledAtBoot) {
+    Log.println("[telnet] off at boot (config) — stopping TCP server");
+    Log.stop();
+  }
+
 #ifdef ROVER_FEATURE_MQTT
   if (config.mqttEnabled && config.mqttHost && config.mqttHost[0] != '\0') {
     mqttClient->begin();
