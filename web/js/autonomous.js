@@ -10,7 +10,9 @@
 
 const TICK_MS         = 200;
 const STOP_CM         = 22;        // start pivoting at/under this
-const CLEAR_CM        = 45;        // resume driving once distance is over this
+const CLEAR_CM        = 30;        // resume driving once distance is over this
+const IMPROVEMENT_CM  = 8;         // accept pivot if it improves clearance by this much
+const HUG_CM          = 15;        // back up before pivoting when this close
 const FAR_CM          = 70;        // PWM hits PWM_MAX at/over this
 const PWM_MIN         = 180;
 const PWM_MAX         = 255;
@@ -25,7 +27,7 @@ const VALID_MAX_CM    = 85;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-export function createAutonomous({ send, dispatch, motor, applyPwm, onStateChange, onTelemetry }) {
+export function createAutonomous({ send, dispatch, motor, applyPwm, onStateChange, onTelemetry, vision }) {
   const state = {
     active: false,
     abort: false,
@@ -42,10 +44,11 @@ export function createAutonomous({ send, dispatch, motor, applyPwm, onStateChang
       const d = parseFloat(msg?.response?.last_distance);
       if (!Number.isFinite(d)) return null;
       onTelemetry?.({ distance: d });
-      // Out-of-range readings are reported as-is (we still need a usable
-      // number for the loop). Treat them as "very far" so we keep moving;
-      // anything inside [VALID_MIN_CM, VALID_MAX_CM] is trusted directly.
-      if (d < VALID_MIN_CM) return null;       // unreliable — skip this tick
+      // Firmware sentinel: -1.0 means "nothing within 80 cm". That's a
+      // CLEAR path, not unreliable — drive at max. Without this the loop
+      // pauses every tick in an open room and the rover sits still.
+      if (d < 0) return VALID_MAX_CM;
+      if (d < VALID_MIN_CM) return null;       // sensor fold-back / noise
       if (d > VALID_MAX_CM) return VALID_MAX_CM;
       return d;
     } catch {
@@ -94,22 +97,63 @@ export function createAutonomous({ send, dispatch, motor, applyPwm, onStateChang
   }
 
   // Pivot until clearance is found or we time out. Returns true on success.
-  async function findClearance() {
-    const side = state.nextPivotSide;
+  // `entryDistance` is the reading that triggered the pivot — used as a
+  // baseline so a meaningful improvement counts as success even if the
+  // ideal CLEAR_CM threshold isn't reached.
+  async function findClearance(entryDistance) {
+    // Seed pivot direction from vision if available — pick whichever
+    // half of the lower frame looks LEAST cluttered. Falls back to the
+    // alternating-side heuristic if vision returns null/center.
+    const thirds      = vision?.getThirds?.();
+    const freshnessMs = vision?.getFreshnessMs?.();
+    const visionHint  = vision?.pickFreeSide?.();
+    if (thirds) {
+      console.log(
+        `[auto] vision thirds: L=${thirds.left.toFixed(2)} ` +
+        `C=${thirds.center.toFixed(2)} R=${thirds.right.toFixed(2)} ` +
+        `(${freshnessMs != null ? freshnessMs.toFixed(0) + 'ms old' : 'fresh'}) ` +
+        `→ hint=${visionHint ?? 'none'}`
+      );
+    } else if (vision) {
+      console.log('[auto] vision: no frame analysed yet → falling back to alternating');
+    }
+
+    let side;
+    if (visionHint === 'left' || visionHint === 'right') {
+      side = visionHint;
+    } else {
+      side = state.nextPivotSide;
+    }
     state.nextPivotSide = side === 'left' ? 'right' : 'left';
+
+    // If we're hugging the wall, peel off first — pivoting in place
+    // when scraping a wall just spins the wheels.
+    if (entryDistance != null && entryDistance < HUG_CM) {
+      await backup();
+      if (state.abort) return false;
+    }
+
     const startedAt = performance.now();
     let attempted = side;
     let flipped = false;
+    let bestSeen = entryDistance ?? 0;
+
     while (!state.abort) {
       await pivotBurst(attempted);
       if (state.abort) return false;
       const d = await readDistance();
-      if (d != null && d >= CLEAR_CM) return true;
+      if (d != null) {
+        if (d >= CLEAR_CM) return true;
+        if (d > bestSeen) bestSeen = d;
+      }
       const elapsed = performance.now() - startedAt;
       if (elapsed > MAX_PIVOT_MS) {
         if (flipped) {
-          // Already flipped once — give up this round, back up and let the
-          // outer loop retry. Avoids a hopeless infinite spin.
+          // Both sides exhausted. If we found a notably better direction
+          // somewhere along the way, accept it — outer loop drives toward
+          // the best heading and re-evaluates. Beats giving up and
+          // marching back into the same wall.
+          if (bestSeen >= (entryDistance ?? 0) + IMPROVEMENT_CM) return true;
           await backup();
           return false;
         }
@@ -123,27 +167,37 @@ export function createAutonomous({ send, dispatch, motor, applyPwm, onStateChang
 
   async function loop() {
     state.startedAt = performance.now();
+    let nullStreak = 0;
     while (!state.abort) {
       if (performance.now() - state.startedAt > HARD_CAP_MS) {
-        // 5-minute safety cap.
+        console.log('[auto] hard cap hit — stopping');
         break;
       }
       const d = await readDistance();
       if (state.abort) break;
       if (d == null) {
-        // Unreliable read — pause one tick rather than guess.
+        nullStreak++;
+        console.log(`[auto] tick: distance=null (streak ${nullStreak}) — pausing`);
+        // Repeated nulls usually mean the sensor is dead or the WS dropped —
+        // exit autonomous rather than spin forever.
+        if (nullStreak >= 25) {       // ~5 s at 200 ms tick
+          console.warn('[auto] giving up — sensor unreliable for 5+ s');
+          break;
+        }
         motor(2, 2);
         await sleep(TICK_MS);
         continue;
       }
+      nullStreak = 0;
       if (d <= STOP_CM) {
+        console.log(`[auto] tick: distance=${d.toFixed(1)} cm <= ${STOP_CM} → pivot`);
         motor(2, 2);
-        const ok = await findClearance();
+        const ok = await findClearance(d);
+        console.log(`[auto] findClearance → ${ok ? 'ok' : 'gave up'}`);
         if (state.abort || !ok) continue;
-        // Loop will re-evaluate; fall through to next iteration which reads
-        // distance again before driving.
         continue;
       }
+      console.log(`[auto] tick: distance=${d.toFixed(1)} cm → forward pwm=${pwmFor(d)}`);
       await driveForward(d);
       await sleep(TICK_MS);
     }

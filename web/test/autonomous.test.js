@@ -7,7 +7,7 @@ import { createAutonomous } from '../js/autonomous.js';
 // Helper that builds an autonomous instance with mocks. distanceQueue is a
 // FIFO of values the simulated `distance` command will return — null is
 // passed through, anything else becomes `{response:{last_distance:n}}`.
-function build({ distanceQueue = [], onTelemetry, onStateChange } = {}) {
+function build({ distanceQueue = [], onTelemetry, onStateChange, vision } = {}) {
   let queueIdx = 0;
   const send = vi.fn(async ({ command }) => {
     if (command !== 'distance') return {};
@@ -20,7 +20,7 @@ function build({ distanceQueue = [], onTelemetry, onStateChange } = {}) {
   const motor = vi.fn();
   const applyPwm = vi.fn();
   const auto = createAutonomous({
-    send, dispatch, motor, applyPwm,
+    send, dispatch, motor, applyPwm, vision,
     onStateChange: onStateChange ?? vi.fn(),
     onTelemetry: onTelemetry ?? vi.fn(),
   });
@@ -129,6 +129,18 @@ describe('distance validity gates', () => {
     expect(dispatch.mock.calls.find(c => c[0] === 'forward')).toBeUndefined();
     auto.stop();
   });
+
+  it('treats firmware -1 sentinel as clear path and drives forward', async () => {
+    // Regression: -1 is the firmware "nothing within 80cm" sentinel.
+    // Previously the loop confused it with sub-VALID_MIN noise and
+    // sat still in any open room.
+    const { auto, dispatch, applyPwm } = build({ distanceQueue: [-1, -1, -1] });
+    auto.start();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(dispatch.mock.calls.find(c => c[0] === 'forward')).toBeDefined();
+    expect(applyPwm).toHaveBeenCalledWith(255);   // VALID_MAX_CM > FAR_CM → PWM_MAX
+    auto.stop();
+  });
 });
 
 describe('obstacle handling', () => {
@@ -142,6 +154,53 @@ describe('obstacle handling', () => {
     auto.start();
     await vi.advanceTimersByTimeAsync(0);
     expect(dispatch).toHaveBeenCalledWith('left');  // first pivot side defaults to left
+    auto.stop();
+  });
+
+  it('uses vision hint to seed pivot side over the alternating default', async () => {
+    // Default first pivot side is 'left'. With a vision module saying
+    // 'right', the first pivot should go right instead.
+    const vision = { pickFreeSide: () => 'right' };
+    const { auto, dispatch } = build({
+      distanceQueue: [15, 60, 60, 60],
+      vision,
+    });
+    auto.start();
+    await vi.advanceTimersByTimeAsync(0);
+    const firstSide = dispatch.mock.calls
+      .map(c => c[0])
+      .find(a => a === 'left' || a === 'right');
+    expect(firstSide).toBe('right');
+    auto.stop();
+  });
+
+  it('falls back to alternating default when vision returns null', async () => {
+    const vision = { pickFreeSide: () => null };
+    const { auto, dispatch } = build({
+      distanceQueue: [15, 60, 60, 60],
+      vision,
+    });
+    auto.start();
+    await vi.advanceTimersByTimeAsync(0);
+    const firstSide = dispatch.mock.calls
+      .map(c => c[0])
+      .find(a => a === 'left' || a === 'right');
+    expect(firstSide).toBe('left');   // built-in default
+    auto.stop();
+  });
+
+  it('treats vision "center" as no hint (alternating default fires)', async () => {
+    const vision = { pickFreeSide: () => 'center' };
+    const { auto, dispatch } = build({
+      distanceQueue: [15, 60, 60, 60],
+      vision,
+    });
+    auto.start();
+    await vi.advanceTimersByTimeAsync(0);
+    const firstSide = dispatch.mock.calls
+      .map(c => c[0])
+      .find(a => a === 'left' || a === 'right');
+    expect(firstSide).toBe('left');
     auto.stop();
   });
 
