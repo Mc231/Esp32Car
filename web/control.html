@@ -83,6 +83,14 @@
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
         </svg>
       </button>
+      <button class="icon-btn" id="transportsBtn" title="Transports" aria-label="Transports">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="6" cy="6" r="2.2"/><circle cx="18" cy="6" r="2.2"/>
+          <circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="18" r="2.2"/>
+          <line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="18" x2="16" y2="18"/>
+          <line x1="6" y1="8" x2="6" y2="16"/><line x1="18" y1="8" x2="18" y2="16"/>
+        </svg>
+      </button>
       <button class="icon-btn" id="rebootBtn" title="Reboot rover" aria-label="Reboot">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="23 4 23 10 17 10"/><path d="M20.49 15A9 9 0 1 1 18 5.36"/>
@@ -91,6 +99,21 @@
       <span class="rec-badge" id="recBadge" hidden>0</span>
     </div>
   </section>
+
+  <div class="modal-backdrop" id="transportsModal" hidden>
+    <div class="modal" role="dialog" aria-labelledby="transportsTitle">
+      <header class="modal-header">
+        <h2 id="transportsTitle">Transports</h2>
+        <button class="icon-btn" id="transportsCloseBtn" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>
+          </svg>
+        </button>
+      </header>
+      <p class="modal-sub">Toggle the firmware's command transports. The active WebSocket pipe is locked because disabling it would orphan this page.</p>
+      <div class="tr-list" id="transportsList"></div>
+    </div>
+  </div>
 </div>
 
 <script type="module" src="js/control.js"></script>

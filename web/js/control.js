@@ -6,6 +6,7 @@ import { toast } from './toast.js';
 import { createRecorder } from './recording.js';
 import { createAutonomous } from './autonomous.js';
 import { bindControls } from './controls-input.js';
+import { fetchTransports, toggleTransport, renderTransports, labelFor } from './transports.js';
 
 const $ = id => document.getElementById(id);
 
@@ -283,6 +284,47 @@ $('speed').addEventListener('input', e => {
   $('speedStat').innerHTML = `PWM <b>${state.speed}</b>`;
 });
 $('speed').addEventListener('change', e => applySpeed(state.speed, 2));
+
+// ---------- Transports panel ----------
+const transportsModal = $('transportsModal');
+const transportsList  = $('transportsList');
+
+async function refreshTransports() {
+  try {
+    const list = await fetchTransports(send);
+    renderTransports(transportsList, list, {
+      onToggle: async (name, enabled, cb) => {
+        cb.disabled = true;
+        try {
+          await toggleTransport(send, name, enabled);
+          toast(`${labelFor(name)} ${enabled ? 'enabled' : 'disabled'}`,
+                enabled ? 'success' : '');
+        } catch (e) {
+          cb.checked = !enabled;   // revert
+          toast(`Failed: ${e.message}`);
+        } finally {
+          cb.disabled = false;
+        }
+      },
+    });
+  } catch (e) {
+    transportsList.innerHTML =
+      `<div class="tr-empty">Failed to load: ${e.message}</div>`;
+  }
+}
+
+function openTransports() {
+  if (!state.online) { toast('Rover offline'); return; }
+  transportsModal.hidden = false;
+  refreshTransports();
+}
+function closeTransports() { transportsModal.hidden = true; }
+
+$('transportsBtn').addEventListener('click', openTransports);
+$('transportsCloseBtn').addEventListener('click', closeTransports);
+transportsModal.addEventListener('click', e => {
+  if (e.target === transportsModal) closeTransports();
+});
 
 // ---------- Reboot ----------
 $('rebootBtn').addEventListener('click', () => {

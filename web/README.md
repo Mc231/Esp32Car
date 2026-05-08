@@ -39,6 +39,7 @@ web/
     ├── recording.js        # record + reverse-replay engine
     ├── autonomous.js       # obstacle-avoidance state machine
     ├── controls-input.js   # d-pad / keyboard event bindings
+    ├── transports.js       # firmware transport list + toggle UI
     ├── picker.js           # picker page entry
     └── control.js          # control page entry — wires everything together
 ```
