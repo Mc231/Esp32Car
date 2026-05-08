@@ -15,7 +15,7 @@ void CommandDispatcher::dispatchRaw(const std::string& raw, const ReplyFn& respo
     Log.println("CommandDispatcher: invalid JSON");
     return;
   }
-  if (!j.contains("command")) {
+  if (!j.contains("command") || !j["command"].is_string()) {
     Log.println("CommandDispatcher: no command specified");
     return;
   }
@@ -177,6 +177,10 @@ void CommandDispatcher::handleSetMotorPWM(const json& j, const ReplyFn& respond)
     respond("{\"status\": \"pwm or motor is not passed\"}");
     return;
   }
+  if (!j["motor"].is_number_integer() || !j["pwm"].is_number_integer()) {
+    respond("{\"status\": \"pwm or motor must be integers\"}");
+    return;
+  }
   int motor = j["motor"].get<int>();
   MotorSelection selection = static_cast<MotorSelection>(motor);
   int pwmValue = j["pwm"].get<int>();
@@ -192,6 +196,10 @@ void CommandDispatcher::handleMotorState(const ReplyFn& respond) {
 void CommandDispatcher::handleSetMotor(const json& j, const ReplyFn& respond) {
   if (!j.contains("action") || !j.contains("motor")) {
     respond("{\"status\": \"Action or motor is not passed\"}");
+    return;
+  }
+  if (!j["action"].is_number_integer() || !j["motor"].is_number_integer()) {
+    respond("{\"status\": \"action or motor must be integers\"}");
     return;
   }
   MotorAction action = static_cast<MotorAction>(j["action"].get<int>());
