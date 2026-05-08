@@ -1,0 +1,72 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master, feature/**]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  firmware:
+    name: firmware (${{ matrix.env }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [esp32cam, wrover-cam, wrover-cam-mqtt]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio/.cache
+            ~/.platformio/packages
+            ~/.platformio/platforms
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-${{ runner.os }}-
+      - name: Install PlatformIO
+        run: pip install --upgrade platformio
+      - name: Build ${{ matrix.env }}
+        run: pio run -e ${{ matrix.env }}
+
+  native-tests:
+    name: native unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio/.cache
+            ~/.platformio/packages
+            ~/.platformio/platforms
+          key: pio-${{ runner.os }}-native-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-${{ runner.os }}-native-
+      - name: Install PlatformIO
+        run: pip install --upgrade platformio
+      - name: Run native tests
+        run: pio test -e native -v
+
+  web-tests:
+    name: web (Vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm test
