@@ -272,6 +272,86 @@ void test_set_transport_missing_fields(void) {
   TEST_ASSERT_TRUE(replyContains("missing"));
 }
 
+// ===== JSON parsing edge cases =====
+
+void test_empty_string_no_reply(void) {
+  dispatcher->dispatchRaw("", captureReply);
+  TEST_ASSERT_EQUAL(0, replyCount);
+}
+
+void test_empty_object_no_reply(void) {
+  dispatcher->dispatchRaw("{}", captureReply);
+  TEST_ASSERT_EQUAL(0, replyCount);
+}
+
+void test_truncated_json_no_reply(void) {
+  // Half-formed payload — common when a transport buffers and a
+  // newline arrives mid-message.
+  dispatcher->dispatchRaw("{\"command\":\"system", captureReply);
+  TEST_ASSERT_EQUAL(0, replyCount);
+}
+
+void test_command_with_leading_and_trailing_whitespace(void) {
+  // Telnet/serial often include trailing CR/LF — the JSON parser is
+  // tolerant of surrounding whitespace, so this still routes to `system`.
+  dispatcher->dispatchRaw("  \r\n  {\"command\":\"system\"}  \r\n",
+                          captureReply);
+  TEST_ASSERT_EQUAL(1, replyCount);
+  TEST_ASSERT_TRUE(replyContains("\"response\""));
+}
+
+void test_extra_unknown_fields_are_ignored(void) {
+  // Forward-compat: extra keys must not break dispatch — the contract
+  // is "ignore what you don't understand" so older firmware can talk
+  // to newer clients.
+  dispatcher->dispatchRaw(
+    "{\"command\":\"system\",\"future_field\":42,\"nested\":{\"x\":1}}",
+    captureReply);
+  TEST_ASSERT_EQUAL(1, replyCount);
+  TEST_ASSERT_TRUE(replyContains("\"response\""));
+}
+
+void test_set_motor_with_string_action_rejected(void) {
+  // Type mismatch — `action` must be int. Without the type guard,
+  // nlohmann::json throws on `.get<int>()` and aborts the process.
+  dispatcher->dispatchRaw(
+    "{\"command\":\"set_motor\",\"action\":\"forward\",\"motor\":2}",
+    captureReply);
+  TEST_ASSERT_EQUAL(1, replyCount);
+  TEST_ASSERT_TRUE(replyContains("must be integers"));
+  TEST_ASSERT_FALSE(controller->setMotorActionCalled);
+}
+
+void test_set_motor_pwm_with_string_pwm_rejected(void) {
+  dispatcher->dispatchRaw(
+    "{\"command\":\"set_motor_pwm\",\"motor\":1,\"pwm\":\"fast\"}",
+    captureReply);
+  TEST_ASSERT_EQUAL(1, replyCount);
+  TEST_ASSERT_TRUE(replyContains("must be integers"));
+  TEST_ASSERT_FALSE(controller->setMotorSpeedCalled);
+}
+
+void test_command_inside_nested_object_is_ignored(void) {
+  // Only the top-level `command` field is honored.
+  dispatcher->dispatchRaw(
+    "{\"wrapper\":{\"command\":\"system\"}}", captureReply);
+  TEST_ASSERT_EQUAL(0, replyCount);
+}
+
+void test_command_with_numeric_value_no_reply(void) {
+  // `command` must be a string; numbers are not a valid command name.
+  dispatcher->dispatchRaw("{\"command\":42}", captureReply);
+  TEST_ASSERT_EQUAL(0, replyCount);
+}
+
+void test_two_back_to_back_dispatches_each_reply(void) {
+  // Each transport line is one envelope — verify we don't carry parser
+  // state between calls.
+  dispatcher->dispatchRaw("{\"command\":\"system\"}", captureReply);
+  dispatcher->dispatchRaw("{\"command\":\"status\"}", captureReply);
+  TEST_ASSERT_EQUAL(2, replyCount);
+}
+
 int main(int /*argc*/, char** /*argv*/) {
   UNITY_BEGIN();
   // Parser & error paths
@@ -305,5 +385,16 @@ int main(int /*argc*/, char** /*argv*/) {
   RUN_TEST(test_set_transport_stops_target);
   RUN_TEST(test_set_transport_unknown_name);
   RUN_TEST(test_set_transport_missing_fields);
+  // JSON parsing edge cases
+  RUN_TEST(test_empty_string_no_reply);
+  RUN_TEST(test_empty_object_no_reply);
+  RUN_TEST(test_truncated_json_no_reply);
+  RUN_TEST(test_command_with_leading_and_trailing_whitespace);
+  RUN_TEST(test_extra_unknown_fields_are_ignored);
+  RUN_TEST(test_set_motor_with_string_action_rejected);
+  RUN_TEST(test_set_motor_pwm_with_string_pwm_rejected);
+  RUN_TEST(test_command_inside_nested_object_is_ignored);
+  RUN_TEST(test_command_with_numeric_value_no_reply);
+  RUN_TEST(test_two_back_to_back_dispatches_each_reply);
   return UNITY_END();
 }
