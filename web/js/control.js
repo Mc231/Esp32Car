@@ -7,6 +7,7 @@ import { createRecorder } from './recording.js';
 import { createAutonomous } from './autonomous.js';
 import { bindControls } from './controls-input.js';
 import { fetchTransports, toggleTransport, renderTransports, labelFor } from './transports.js';
+import { createVisionAnalyzer } from './vision.js';
 
 const $ = id => document.getElementById(id);
 
@@ -213,6 +214,12 @@ $('replayBtn').addEventListener('click', async () => {
   if (completed) toast('Replay finished', 'success');
 });
 
+// ---------- Vision (camera-based pivot hint) ----------
+// logEvery: heartbeat log every Nth sample so you can see vision is
+// alive even when the rover isn't pivoting. 4 = one log every ~2 s.
+const vision = createVisionAnalyzer({ imgEl: $('cameraStream'), logEvery: 4 });
+vision.start();
+
 // ---------- Autonomous mode ----------
 let userSpeedBeforeAuto = state.speed;
 const auto = createAutonomous({
@@ -220,6 +227,7 @@ const auto = createAutonomous({
   dispatch,
   motor,
   applyPwm: pwm => applySpeed(pwm, 2),
+  vision,
   onTelemetry: ({ distance, pwm }) => {
     if (distance != null) {
       const cm = parseFloat(distance).toFixed(1);
@@ -321,9 +329,19 @@ function openTransports() {
 function closeTransports() { transportsModal.hidden = true; }
 
 $('transportsBtn').addEventListener('click', openTransports);
-$('transportsCloseBtn').addEventListener('click', closeTransports);
-transportsModal.addEventListener('click', e => {
+$('transportsCloseBtn').addEventListener('click', e => {
+  e.stopPropagation();
+  closeTransports();
+});
+// Backdrop click — only the backdrop element itself, not bubbled clicks
+// from inside `.modal`. Use mousedown so a drag that ends inside the
+// modal doesn't accidentally close.
+transportsModal.addEventListener('mousedown', e => {
   if (e.target === transportsModal) closeTransports();
+});
+// Escape key — universal "dismiss this modal" expectation.
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !transportsModal.hidden) closeTransports();
 });
 
 // ---------- Reboot ----------

@@ -40,6 +40,7 @@ web/
     ├── autonomous.js       # obstacle-avoidance state machine
     ├── controls-input.js   # d-pad / keyboard event bindings
     ├── transports.js       # firmware transport list + toggle UI
+    ├── vision.js           # camera-frame clutter analysis → pivot hint
     ├── picker.js           # picker page entry
     └── control.js          # control page entry — wires everything together
 ```
@@ -53,24 +54,39 @@ files via any local HTTP server. Open the source to see what they do.
 
 You can't open `index.html` directly with `file://` — modern browsers block
 WebSocket connections from `file://` origins. You need a tiny local web
-server. Pick whichever you have:
+server. Easiest:
 
-### Python (pre-installed on macOS)
 ```bash
 cd web
-python3 -m http.server 8000
+./serve.sh
 ```
 
-### Node.js (if you have npm)
+That starts Python's built-in HTTP server on port 8000 and opens
+`http://localhost:8000/` in your default browser. To use a different port:
+
 ```bash
-cd web
+./serve.sh 8080
+```
+
+Equivalent npm shortcut (same script, just convenient if you already
+`npm install`ed for tests):
+
+```bash
+npm start
+```
+
+### Manual fallback
+
+If you don't have `python3` or want full control:
+
+```bash
+# Node.js
 npx serve -l 8000 .
+
+# or pick whatever HTTP server you prefer; just serve the web/ directory.
 ```
 
-### Then open
-```
-http://localhost:8000/
-```
+Then open `http://localhost:8000/`.
 
 ---
 
