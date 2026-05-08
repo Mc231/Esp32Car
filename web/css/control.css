@@ -263,6 +263,10 @@ header.bar {
   z-index: 100;
   padding: 16px;
 }
+/* `display: flex` above wins against the user-agent rule that hides
+   `[hidden]` elements — re-assert hiding so toggling `.hidden = true`
+   from JS actually works. */
+.modal-backdrop[hidden] { display: none; }
 .modal {
   background: var(--bg-1);
   border: 1px solid var(--border);
