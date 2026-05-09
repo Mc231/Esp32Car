@@ -8,3 +8,9 @@ data/config.cfg
 # Web app test artefacts
 web/node_modules/
 web/coverage/
+
+# Local telemetry database + camera snapshots (server/app.py)
+rover-logs.db
+rover-logs.db-*
+rover-snapshots/
+__pycache__/

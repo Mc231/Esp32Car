@@ -87,6 +87,7 @@ export function createVisionAnalyzer({
   frameW = FRAME_W,
   frameH = FRAME_H,
   logEvery = 0,
+  onSample = null,                  // called with each {left, center, right}
   doc = (typeof document !== 'undefined' ? document : null),
 } = {}) {
   if (!imgEl) throw new Error('createVisionAnalyzer: imgEl required');
@@ -121,6 +122,7 @@ export function createVisionAnalyzer({
       lastAt = (typeof performance !== 'undefined' ? performance.now() : Date.now());
       lastError = null;
       sampleCount++;
+      try { onSample?.(lastThirds); } catch { /* logger errors mustn't break vision */ }
       if (logEvery > 0 && sampleCount % logEvery === 0) {
         const pick = pickFreeSide(lastThirds);
         console.log(

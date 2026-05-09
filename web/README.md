@@ -41,6 +41,9 @@ web/
     ├── controls-input.js   # d-pad / keyboard event bindings
     ├── transports.js       # firmware transport list + toggle UI
     ├── vision.js           # camera-frame clutter analysis → pivot hint
+    ├── drive.js            # held-input → motor-command translator
+    ├── logger.js           # session logger (events → server SQLite)
+    ├── snapshot.js         # camera-frame → JPEG capture for events
     ├── picker.js           # picker page entry
     └── control.js          # control page entry — wires everything together
 ```

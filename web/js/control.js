@@ -8,6 +8,9 @@ import { createAutonomous } from './autonomous.js';
 import { bindControls } from './controls-input.js';
 import { fetchTransports, toggleTransport, renderTransports, labelFor } from './transports.js';
 import { createVisionAnalyzer } from './vision.js';
+import { computeMotorCommands } from './drive.js';
+import { createLogger } from './logger.js';
+import { createSnapshotter } from './snapshot.js';
 
 const $ = id => document.getElementById(id);
 
@@ -47,6 +50,15 @@ function setOnline(ok) {
   $('connText').textContent = ok ? 'Online' : 'Offline';
 }
 
+// ---------- Telemetry logger ----------
+// Captures every interesting event (manual inputs, autonomous decisions,
+// vision samples, motor commands) into the local server's SQLite store
+// for offline analysis. Fails open if the server isn't reachable.
+const logger = createLogger({ host, name });
+logger.start();
+window.addEventListener('beforeunload', () => logger.flushBeacon());
+window.addEventListener('pagehide',     () => logger.flushBeacon());
+
 // ---------- WebSocket connection ----------
 const conn = createConnection({
   host,
@@ -54,10 +66,12 @@ const conn = createConnection({
     setOnline(true);
     startPolling();
     loadStaticInfo();
+    logger.event('ws', { state: 'open' });
   },
   onClose: () => {
     setOnline(false);
     stopPolling();
+    logger.event('ws', { state: 'close' });
   },
 });
 
@@ -149,12 +163,91 @@ function applySpeed(v, m = 2) {
   motors.forEach(mm => send({ command: 'set_motor_pwm', motor: mm, pwm }).catch(() => {}));
 }
 
-function dispatch(act) {
-  if (act === 'forward')  return motor(0, 2);
-  if (act === 'backward') return motor(1, 2);
-  if (act === 'stop')     return motor(2, 2);
-  if (act === 'left')     { motor(2, 0); return motor(0, 1); }
-  if (act === 'right')    { motor(2, 1); return motor(0, 0); }
+// Live-input state machine: tracks which d-pad/keyboard inputs are
+// currently held so combinations (forward + left = arc, not stop)
+// produce a single combined motor command instead of fighting each
+// other.
+const heldInputs = new Set();
+const lastSent   = { la: null, ra: null, lp: null, rp: null };
+
+function applyHeldInputs() {
+  const cmd = computeMotorCommands(heldInputs, state.speed);
+  console.log(
+    `[drive] held=${[...heldInputs].join('+') || 'none'} ` +
+    `speed=${state.speed} ` +
+    `→ L:a=${cmd.leftAction}/p=${cmd.leftPwm} ` +
+    `R:a=${cmd.rightAction}/p=${cmd.rightPwm}`
+  );
+  logger.event('input', {
+    held:  [...heldInputs],
+    speed: state.speed,
+    cmd,
+  });
+  // Only send what changed — keeps the WS FIFO small and avoids
+  // re-issuing identical PWM commands at keepalive cadence.
+  if (cmd.leftPwm  !== lastSent.lp) {
+    send({ command: 'set_motor_pwm', motor: 0, pwm: cmd.leftPwm  }).catch(() => {});
+    lastSent.lp = cmd.leftPwm;
+  }
+  if (cmd.rightPwm !== lastSent.rp) {
+    send({ command: 'set_motor_pwm', motor: 1, pwm: cmd.rightPwm }).catch(() => {});
+    lastSent.rp = cmd.rightPwm;
+  }
+  if (cmd.leftAction  !== lastSent.la) {
+    send({ command: 'set_motor', motor: 0, action: cmd.leftAction  }).catch(() => {});
+    lastSent.la = cmd.leftAction;
+  }
+  if (cmd.rightAction !== lastSent.ra) {
+    send({ command: 'set_motor', motor: 1, action: cmd.rightAction }).catch(() => {});
+    lastSent.ra = cmd.rightAction;
+  }
+}
+
+// Two-arg form (kind = 'press' | 'release') comes from the d-pad /
+// keyboard input layer. Single-arg form is used by the recorder and
+// the autonomous loop and falls back to the original tank-style
+// commands so existing recordings replay identically.
+function dispatch(act, kind) {
+  if (kind === 'refresh') {
+    // Keepalive: clear the dedup cache and re-issue current commands
+    // so the firmware deadman doesn't auto-stop motors while a key is
+    // held without state changes.
+    lastSent.la = lastSent.ra = lastSent.lp = lastSent.rp = null;
+    applyHeldInputs();
+    return;
+  }
+  if (kind === 'press' || kind === 'release') {
+    if (kind === 'press') {
+      if (act === 'stop') heldInputs.clear();
+      else heldInputs.add(act);
+    } else {
+      heldInputs.delete(act);
+    }
+    applyHeldInputs();
+    return;
+  }
+  // Legacy single-arg path — recorder playback, autonomous mode, etc.
+  // Route through the same drive logic the live state machine uses so
+  // PWM and action are sent together. Without this, replay only sends
+  // set_motor (action) and motors stay at whatever PWM they had after
+  // the last live release — usually 0, so playback wouldn't move.
+  const transient = new Set();
+  if (act === 'forward'  || act === 'backward' ||
+      act === 'left'     || act === 'right') {
+    transient.add(act);
+  }
+  // 'stop' → empty set → STOP_BOTH
+  const cmd = computeMotorCommands(transient, state.speed);
+  send({ command: 'set_motor_pwm', motor: 0, pwm: cmd.leftPwm  }).catch(() => {});
+  send({ command: 'set_motor_pwm', motor: 1, pwm: cmd.rightPwm }).catch(() => {});
+  send({ command: 'set_motor', motor: 0, action: cmd.leftAction  }).catch(() => {});
+  send({ command: 'set_motor', motor: 1, action: cmd.rightAction }).catch(() => {});
+  // Keep the live cache in sync — next d-pad press will see the real
+  // current state instead of stale values from before playback ran.
+  lastSent.la = cmd.leftAction;
+  lastSent.ra = cmd.rightAction;
+  lastSent.lp = cmd.leftPwm;
+  lastSent.rp = cmd.rightPwm;
 }
 
 // ---------- Recorder + replay ----------
@@ -217,8 +310,19 @@ $('replayBtn').addEventListener('click', async () => {
 // ---------- Vision (camera-based pivot hint) ----------
 // logEvery: heartbeat log every Nth sample so you can see vision is
 // alive even when the rover isn't pivoting. 4 = one log every ~2 s.
-const vision = createVisionAnalyzer({ imgEl: $('cameraStream'), logEvery: 4 });
+const vision = createVisionAnalyzer({
+  imgEl: $('cameraStream'),
+  logEvery: 4,
+  onSample: thirds => logger.event('vision', thirds),
+});
 vision.start();
+
+// ---------- Snapshotter (per-event camera frame for analysis) ----------
+const snapshotter = createSnapshotter({ imgEl: $('cameraStream') });
+async function recordSnapshot(type, payload) {
+  const blob = await snapshotter.captureJpeg();
+  return logger.snapshotEvent(type, payload, blob);
+}
 
 // ---------- Autonomous mode ----------
 let userSpeedBeforeAuto = state.speed;
@@ -228,6 +332,8 @@ const auto = createAutonomous({
   motor,
   applyPwm: pwm => applySpeed(pwm, 2),
   vision,
+  logger,
+  onSnapshot: recordSnapshot,
   onTelemetry: ({ distance, pwm }) => {
     if (distance != null) {
       const cm = parseFloat(distance).toFixed(1);
@@ -291,7 +397,15 @@ $('speed').addEventListener('input', e => {
   $('speedVal').textContent = state.speed;
   $('speedStat').innerHTML = `PWM <b>${state.speed}</b>`;
 });
-$('speed').addEventListener('change', e => applySpeed(state.speed, 2));
+$('speed').addEventListener('change', e => {
+  // Invalidate the held-input cache so the next press recomputes PWM
+  // against the new slider value instead of skipping it as "unchanged".
+  lastSent.lp = lastSent.rp = null;
+  applySpeed(state.speed, 2);
+  // If the user is currently holding a direction, immediately re-apply
+  // so the live arc/turn picks up the new speed without releasing keys.
+  if (heldInputs.size) applyHeldInputs();
+});
 
 // ---------- Transports panel ----------
 const transportsModal = $('transportsModal');

@@ -12,7 +12,11 @@ export function bindControls({ dispatchFn, onPress, onRelease }) {
   function startKeepalive(act) {
     heldAction = act;
     clearInterval(keepaliveTimer);
-    keepaliveTimer = setInterval(() => { if (heldAction) dispatchFn(heldAction); }, 700);
+    // Re-issue the latest commands so the firmware's deadman (1500 ms)
+    // sees fresh activity while the user holds a button. 'refresh'
+    // kind bypasses control.js's dedup cache — without that, a steady
+    // hold would only send commands once and the rover would stop.
+    keepaliveTimer = setInterval(() => { if (heldAction) dispatchFn(heldAction, 'refresh'); }, 700);
   }
   function stopKeepalive() {
     heldAction = null;
@@ -25,7 +29,7 @@ export function bindControls({ dispatchFn, onPress, onRelease }) {
     held.add(act);
     btn.classList.add('active');
     onPress?.(act);
-    dispatchFn(act);
+    dispatchFn(act, 'press');
     if (act !== 'stop') startKeepalive(act);
   }
 
@@ -36,7 +40,10 @@ export function bindControls({ dispatchFn, onPress, onRelease }) {
     onRelease?.(act);
     if (act !== 'stop') {
       stopKeepalive();
-      dispatchFn('stop');
+      // Tell the state machine THIS specific input was released — not
+      // the same as 'stop' (which would clear all held inputs and kill
+      // any other key the user is still holding).
+      dispatchFn(act, 'release');
     }
   }
 

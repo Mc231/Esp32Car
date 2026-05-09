@@ -12,7 +12,11 @@ const TICK_MS         = 200;
 const STOP_CM         = 22;        // start pivoting at/under this
 const CLEAR_CM        = 30;        // resume driving once distance is over this
 const IMPROVEMENT_CM  = 8;         // accept pivot if it improves clearance by this much
-const HUG_CM          = 15;        // back up before pivoting when this close
+// HUG_CM raised to STOP_CM (22) after data analysis: the 17-21 cm
+// entry-distance bucket had only 65% pivot success vs 100% under 12 cm.
+// Backing up before pivoting in ALL stop-trigger cases gave that bucket
+// the elbow room it was missing. See server/README.md for the query.
+const HUG_CM          = 22;        // back up before pivoting when this close
 const FAR_CM          = 70;        // PWM hits PWM_MAX at/over this
 const PWM_MIN         = 180;
 const PWM_MAX         = 255;
@@ -27,7 +31,22 @@ const VALID_MAX_CM    = 85;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-export function createAutonomous({ send, dispatch, motor, applyPwm, onStateChange, onTelemetry, vision }) {
+export function createAutonomous({
+  send, dispatch, motor, applyPwm,
+  onStateChange, onTelemetry, vision, logger, onSnapshot,
+}) {
+  // Convenience — emit a structured event into the session logger if
+  // one was supplied. Wrapped in try/catch because logger failures
+  // must never affect the autonomous loop.
+  const logEvt = (type, payload) => {
+    try { logger?.event?.(type, payload); } catch { /* swallow */ }
+  };
+  // Same idea for camera snapshots — capture the frame at the time of
+  // an interesting event for offline review. Awaiting is optional;
+  // best-effort, never blocks the loop.
+  const snap = (type, payload) => {
+    try { onSnapshot?.(type, payload); } catch { /* swallow */ }
+  };
   const state = {
     active: false,
     abort: false,
@@ -125,6 +144,8 @@ export function createAutonomous({ send, dispatch, motor, applyPwm, onStateChang
       side = state.nextPivotSide;
     }
     state.nextPivotSide = side === 'left' ? 'right' : 'left';
+    logEvt('pivot_start', { entryDistance, visionHint, side, thirds });
+    snap('pivot_start', { entryDistance, visionHint, side });
 
     // If we're hugging the wall, peel off first — pivoting in place
     // when scraping a wall just spins the wheels.
@@ -168,9 +189,11 @@ export function createAutonomous({ send, dispatch, motor, applyPwm, onStateChang
   async function loop() {
     state.startedAt = performance.now();
     let nullStreak = 0;
+    let naturalExit = false;
     while (!state.abort) {
       if (performance.now() - state.startedAt > HARD_CAP_MS) {
         console.log('[auto] hard cap hit — stopping');
+        naturalExit = true;
         break;
       }
       const d = await readDistance();
@@ -182,6 +205,7 @@ export function createAutonomous({ send, dispatch, motor, applyPwm, onStateChang
         // exit autonomous rather than spin forever.
         if (nullStreak >= 25) {       // ~5 s at 200 ms tick
           console.warn('[auto] giving up — sensor unreliable for 5+ s');
+          naturalExit = true;
           break;
         }
         motor(2, 2);
@@ -191,17 +215,25 @@ export function createAutonomous({ send, dispatch, motor, applyPwm, onStateChang
       nullStreak = 0;
       if (d <= STOP_CM) {
         console.log(`[auto] tick: distance=${d.toFixed(1)} cm <= ${STOP_CM} → pivot`);
+        logEvt('tick', { distance: d, decision: 'pivot' });
         motor(2, 2);
         const ok = await findClearance(d);
         console.log(`[auto] findClearance → ${ok ? 'ok' : 'gave up'}`);
+        logEvt('pivot_end', { entryDistance: d, outcome: ok ? 'ok' : 'gave_up' });
+        snap('pivot_end', { entryDistance: d, outcome: ok ? 'ok' : 'gave_up' });
         if (state.abort || !ok) continue;
         continue;
       }
       console.log(`[auto] tick: distance=${d.toFixed(1)} cm → forward pwm=${pwmFor(d)}`);
+      logEvt('tick', { distance: d, decision: 'drive', pwm: pwmFor(d) });
       await driveForward(d);
       await sleep(TICK_MS);
     }
-    motor(2, 2);
+    // Only fire the safety stop on NATURAL exit. If the user cancelled
+    // (state.abort = true via stop()), they're taking over the rover —
+    // our trailing motor(2,2) would override their next command and
+    // make turning while-cancelling-auto feel broken.
+    if (naturalExit) motor(2, 2);
   }
 
   function start() {
@@ -210,10 +242,12 @@ export function createAutonomous({ send, dispatch, motor, applyPwm, onStateChang
     state.abort = false;
     state.phase = 'driving';
     notify();
+    logEvt('auto', { state: 'start' });
     loop().finally(() => {
       state.active = false;
       state.phase = 'idle';
       notify();
+      logEvt('auto', { state: 'stop' });
     });
   }
 
@@ -221,6 +255,7 @@ export function createAutonomous({ send, dispatch, motor, applyPwm, onStateChang
     if (!state.active) return;
     state.abort = true;
     motor(2, 2);
+    logEvt('auto', { state: 'cancel' });
   }
 
   return {

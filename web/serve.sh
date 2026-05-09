@@ -36,4 +36,15 @@ fi
 
 echo "Serving rover web app at ${URL}"
 echo "Press Ctrl-C to stop."
-exec python3 -m http.server "${PORT}" --bind 127.0.0.1
+
+# Use the project's logging server (server/app.py) when present — it
+# serves the same static files AND captures session telemetry into
+# SQLite for offline analysis. Falls back to plain http.server if the
+# logging server is missing (so this script keeps working in stripped-
+# down checkouts).
+SERVER_APP="$(dirname "$0")/../server/app.py"
+if [ -f "${SERVER_APP}" ]; then
+  exec python3 "${SERVER_APP}" --port "${PORT}"
+else
+  exec python3 -m http.server "${PORT}" --bind 127.0.0.1
+fi

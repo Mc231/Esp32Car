@@ -147,12 +147,18 @@ describe('obstacle handling', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
+  // After raising HUG_CM to 22, every pivot is preceded by a ~410 ms
+  // backup (BACKUP_MS=350 + 60 ms settle). Tests now need to advance
+  // well past that before any pivot dispatch fires.
+  const PIVOT_DRAIN_MS = 800;        // covers backup + first pivot burst
+  const TWO_ENCOUNTER_MS = 4000;     // backup + pivot + drive + obstacle + backup + pivot
+
   it('triggers pivot when distance ≤ STOP_CM', async () => {
     // First reading 15cm (obstacle) → should pivot, not drive forward.
     // After pivoting, second reading 60cm (clear) → resume drive.
     const { auto, dispatch } = build({ distanceQueue: [15, 60, 60, 60] });
     auto.start();
-    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(PIVOT_DRAIN_MS);
     expect(dispatch).toHaveBeenCalledWith('left');  // first pivot side defaults to left
     auto.stop();
   });
@@ -166,7 +172,7 @@ describe('obstacle handling', () => {
       vision,
     });
     auto.start();
-    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(PIVOT_DRAIN_MS);
     const firstSide = dispatch.mock.calls
       .map(c => c[0])
       .find(a => a === 'left' || a === 'right');
@@ -181,7 +187,7 @@ describe('obstacle handling', () => {
       vision,
     });
     auto.start();
-    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(PIVOT_DRAIN_MS);
     const firstSide = dispatch.mock.calls
       .map(c => c[0])
       .find(a => a === 'left' || a === 'right');
@@ -196,7 +202,7 @@ describe('obstacle handling', () => {
       vision,
     });
     auto.start();
-    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(PIVOT_DRAIN_MS);
     const firstSide = dispatch.mock.calls
       .map(c => c[0])
       .find(a => a === 'left' || a === 'right');
@@ -210,7 +216,7 @@ describe('obstacle handling', () => {
       distanceQueue: [15, 60, 60, 15, 60, 60, 60]
     });
     auto.start();
-    await vi.advanceTimersByTimeAsync(50);
+    await vi.advanceTimersByTimeAsync(TWO_ENCOUNTER_MS);
     const sides = dispatch.mock.calls
       .map(c => c[0])
       .filter(a => a === 'left' || a === 'right');
@@ -238,6 +244,26 @@ describe('cancellation', () => {
     await vi.runAllTimersAsync();
     expect(auto.isActive()).toBe(false);
     expect(motor).toHaveBeenCalledWith(2, 2);
+  });
+
+  it('does NOT emit a trailing motor stop after user-cancelled stop()', async () => {
+    // Regression: previously the loop's tail motor(2,2) fired after
+    // stop() returned, racing the user's follow-up turn command and
+    // overriding it. After user-cancelled stop, the only motor(2,2)
+    // we should see is the synchronous one inside stop() itself.
+    const { auto, motor } = build({ distanceQueue: [60, 60, 60, 60, 60] });
+    auto.start();
+    await vi.advanceTimersByTimeAsync(0);
+    auto.stop();
+    const stopsBeforeDrain = motor.mock.calls.filter(
+      ([a, m]) => a === 2 && m === 2
+    ).length;
+    await vi.runAllTimersAsync();
+    const stopsAfterDrain = motor.mock.calls.filter(
+      ([a, m]) => a === 2 && m === 2
+    ).length;
+    // Loop tail must not have added a second STOP after stop() returned.
+    expect(stopsAfterDrain).toBe(stopsBeforeDrain);
   });
 });
 
