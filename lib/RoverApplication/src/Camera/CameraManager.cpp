@@ -42,16 +42,20 @@ void CameraManager::setupCamera()  {
   config.pin_sccb_scl = SIOC_GPIO_NUM;
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
-  // Streaming framesize. VGA = 640x480 — good quality, fits comfortably in
-  // PSRAM. Drop to QVGA (320x240) if Wi-Fi struggles or capture starts failing.
-  static constexpr framesize_t kStreamFrameSize = FRAMESIZE_VGA;
+  // Streaming framesize. QVGA = 320x240 — the sweet spot on this link: smaller
+  // frames don't help because the weak radio is latency-bound, not byte-bound,
+  // and the fps cap already governs round-trips. 4:3 so the web UI's 90° CSS
+  // rotation stays correct. Bump to VGA only with a stronger radio.
+  static constexpr framesize_t kStreamFrameSize = FRAMESIZE_QVGA;
 
   config.xclk_freq_hz = 20000000;
   config.frame_size = kStreamFrameSize;
   config.pixel_format = PIXFORMAT_JPEG;
   config.grab_mode = CAMERA_GRAB_LATEST;
   config.fb_location = CAMERA_FB_IN_PSRAM;
-  config.jpeg_quality = 12;
+  config.jpeg_quality = 16;   // higher number = smaller frames; eases the
+                              // Wi-Fi link so the stream stays low-latency.
+                              // Pair with the stream frame-rate cap in app_httpd.
   config.fb_count = psramFound() ? 2 : 1;
   if (!psramFound()) {
     config.fb_location = CAMERA_FB_IN_DRAM;
@@ -70,15 +74,19 @@ void CameraManager::setupCamera()  {
     s->set_saturation(s, -2);
   }
 
+  // Re-apply framesize to ensure sensor is actively streaming. Same size as
+  // init so frame buffers stay valid.
+  s->set_framesize(s, kStreamFrameSize);
+
 #ifdef ROVER_BOARD_WROVER_CAM
   // OV2640 on the WROVER-DEV daughter board is mounted upside-down relative
   // to the rover chassis. Flip vertically (and horizontally — otherwise the
   // image would be mirrored after the vflip).
+  // NOTE: this MUST come after set_framesize — on the OV2640 set_framesize
+  // reinitialises sensor registers and resets vflip/hmirror back to 0, so
+  // applying orientation earlier gets silently wiped (observed: hmirror not
+  // latching at boot).
   s->set_vflip(s, 1);
   s->set_hmirror(s, 1);
 #endif
-
-  // Re-apply framesize to ensure sensor is actively streaming. Same size as
-  // init so frame buffers stay valid.
-  s->set_framesize(s, kStreamFrameSize);
 }

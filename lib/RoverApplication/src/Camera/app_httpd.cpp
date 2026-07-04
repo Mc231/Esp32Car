@@ -757,6 +757,13 @@ static esp_err_t stream_handler(httpd_req_t *req)
         }
         int64_t fr_end = esp_timer_get_time();
 
+        // Frame-rate cap: pace the MJPEG stream so the Wi-Fi radio keeps
+        // airtime for WS control packets. Without it the OV2640 floods ~40fps
+        // at QVGA and this board's link collapses to 1-2s latency, making both
+        // video and driving laggy. ~70ms between frames -> ~12fps, plenty for
+        // teleop, and it lets control commands through.
+        vTaskDelay(70 / portTICK_PERIOD_MS);
+
 #if CONFIG_ESP_FACE_DETECT_ENABLED && ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_INFO
         int64_t ready_time = (fr_ready - fr_start) / 1000;
         int64_t face_time = (fr_face - fr_ready) / 1000;
